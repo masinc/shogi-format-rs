@@ -153,6 +153,13 @@ impl From<UnpromotedPiece> for Piece {
     }
 }
 
+impl From<&UnpromotedPiece> for Piece {
+    #[inline]
+    fn from(piece: &UnpromotedPiece) -> Self {
+        Self::Unpromoted(*piece)
+    }
+}
+
 impl From<PromotedPiece> for Piece {
     #[inline]
     fn from(piece: PromotedPiece) -> Self {
@@ -160,9 +167,23 @@ impl From<PromotedPiece> for Piece {
     }
 }
 
+impl From<&PromotedPiece> for Piece {
+    #[inline]
+    fn from(piece: &PromotedPiece) -> Self {
+        Self::Promoted(*piece)
+    }
+}
+
 impl From<PieceWithColor> for Piece {
     #[inline]
     fn from(piece: PieceWithColor) -> Self {
+        piece.piece
+    }
+}
+
+impl From<&PieceWithColor> for Piece {
+    #[inline]
+    fn from(piece: &PieceWithColor) -> Self {
         piece.piece
     }
 }
@@ -287,10 +308,24 @@ impl From<Piece> for PieceKind {
     }
 }
 
+impl From<&Piece> for PieceKind {
+    #[inline]
+    fn from(piece: &Piece) -> Self {
+        Self::WithoutColor(*piece)
+    }
+}
+
 impl From<PieceWithColor> for PieceKind {
     #[inline]
     fn from(piece: PieceWithColor) -> Self {
         Self::WithColor(piece)
+    }
+}
+
+impl From<&PieceWithColor> for PieceKind {
+    #[inline]
+    fn from(piece: &PieceWithColor) -> Self {
+        Self::WithColor(*piece)
     }
 }
 
@@ -301,9 +336,23 @@ impl From<UnpromotedPiece> for PieceKind {
     }
 }
 
+impl From<&UnpromotedPiece> for PieceKind {
+    #[inline]
+    fn from(piece: &UnpromotedPiece) -> Self {
+        Self::WithoutColor(piece.into())
+    }
+}
+
 impl From<PromotedPiece> for PieceKind {
     #[inline]
     fn from(piece: PromotedPiece) -> Self {
+        Self::WithoutColor(piece.into())
+    }
+}
+
+impl From<&PromotedPiece> for PieceKind {
+    #[inline]
+    fn from(piece: &PromotedPiece) -> Self {
         Self::WithoutColor(piece.into())
     }
 }
