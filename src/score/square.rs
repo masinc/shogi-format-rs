@@ -153,7 +153,7 @@ mod tests {
     }
 
     #[test]
-    fn squarea_new_unchecked() {
+    fn square_new_unchecked() {
         for x in 1..=9 {
             Square::new_unchecked(x, x);
         }
@@ -161,7 +161,7 @@ mod tests {
 
     #[test]
     #[should_panic]
-    fn squere_new_unckecked_error() {
+    fn square_new_unckecked_error() {
         Square::new_unchecked(0, 0);
     }
 
