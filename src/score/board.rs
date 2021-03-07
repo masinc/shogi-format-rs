@@ -7,14 +7,486 @@ use piece::{PieceNumber, PieceWithColor};
 use serde::{Deserialize, Serialize};
 use std::{
     collections::{HashMap, HashSet},
-    convert::TryInto,
     hash::Hash,
     mem,
     ops::Deref,
 };
 
-pub type Board = HashSet<BoardValue>;
 pub type PieceCount = usize;
+
+type BoardInner = HashSet<BoardValue>;
+#[derive(PartialEq, Eq, Debug, Clone)]
+pub struct Board {
+    inner: BoardInner,
+}
+
+impl Board {
+    #[inline]
+    pub fn new() -> Self {
+        Self::with_capacity(40)
+    }
+
+    #[inline]
+    pub fn with_capacity(capacity: usize) -> Self {
+        Self {
+            inner: BoardInner::with_capacity(capacity),
+        }
+    }
+
+    #[inline]
+    pub fn field(&self) -> HashMap<Square, PieceWithColor> {
+        self.iter()
+            .filter_map(|x| match x {
+                BoardValue::Field { square, piece } => Some((*square, *piece)),
+                _ => None,
+            })
+            .collect()
+    }
+
+    #[inline]
+    pub fn stand(&self) -> HashMap<PieceWithColor, PieceCount> {
+        self.iter()
+            .filter_map(|x| match x {
+                BoardValue::Stand { piece, count } => Some((*piece, *count)),
+                _ => None,
+            })
+            .collect()
+    }
+
+    #[inline]
+    pub fn outside(&self) -> HashMap<Piece, PieceCount> {
+        self.iter()
+            .filter_map(|x| match x {
+                BoardValue::Outside { piece, count } => Some((*piece, *count)),
+                _ => None,
+            })
+            .collect()
+    }
+
+    #[inline]
+    pub fn piece_count(&self) -> PieceCount {
+        self.iter()
+            .map(|x| match x {
+                BoardValue::Field {
+                    piece: _,
+                    square: _,
+                } => 1,
+                BoardValue::Stand { piece: _, count } => *count,
+                BoardValue::Outside { piece: _, count } => *count,
+            })
+            .sum()
+    }
+
+    pub fn find_piece(&self, piece: impl Into<PieceKind>) -> HashSet<BoardValue> {
+        let target_piece: PieceKind = piece.into();
+        let target_piece = target_piece.piece();
+
+        self.iter()
+            .filter(|x| match x {
+                BoardValue::Field { piece, square: _ } => piece.piece() == target_piece,
+                BoardValue::Stand { piece, count: _ } => piece.piece() == target_piece,
+                BoardValue::Outside { piece, count: _ } => piece == target_piece,
+            })
+            .cloned()
+            .collect()
+    }
+
+    #[inline]
+    pub fn filter_field(&self) -> HashSet<BoardValue> {
+        self.iter()
+            .filter(|x| matches!(x, BoardValue::Field { .. }))
+            .cloned()
+            .collect()
+    }
+
+    #[inline]
+    pub fn filter_stand(&self) -> HashSet<BoardValue> {
+        self.iter()
+            .filter(|x| matches!(x, BoardValue::Stand { .. }))
+            .cloned()
+            .collect()
+    }
+
+    #[inline]
+    pub fn filter_outside(&self) -> HashSet<BoardValue> {
+        self.iter()
+            .filter(|x| matches!(x, BoardValue::Outside { .. }))
+            .cloned()
+            .collect()
+    }
+
+    #[inline]
+    pub fn len(&self) -> usize {
+        self.inner.len()
+    }
+
+    #[inline]
+    pub fn is_empty(&self) -> bool {
+        self.inner.is_empty()
+    }
+
+    #[inline]
+    pub fn contains(&self, value: impl Into<BoardKey>) -> bool {
+        let value: BoardKey = value.into();
+        match value {
+            BoardKey::Piece(piece) => self.shallow_contains_piece(piece),
+            BoardKey::PieceWithPosition(piece) => self.shallow_contains_piece_with_position(&piece),
+            BoardKey::Square(square) => self.shallow_contains_square(&square),
+            BoardKey::BoardValue(value) => self.deep_contains(&value),
+        }
+    }
+
+    #[inline]
+    pub fn shallow_contains_piece(&self, value: impl Into<PieceKind>) -> bool {
+        let value = value.into();
+        self.iter().any(|x| x.eq_piece_kind(value))
+    }
+
+    #[inline]
+    pub fn shallow_contains_piece_with_position(&self, value: &PieceWithPosition) -> bool {
+        self.iter()
+            .any(|x| x.eq_piece_kind(value.kind) && x.eq_piece_position(value.position))
+    }
+
+    #[inline]
+    pub fn shallow_contains_square(&self, value: &Square) -> bool {
+        self.iter().any(|x| x.eq_square(value))
+    }
+
+    #[inline]
+    pub fn deep_contains(&self, value: &BoardValue) -> bool {
+        self.inner.contains(value)
+    }
+
+    #[inline]
+    pub fn piece_position(&self, value: impl Into<BoardKey>) -> Option<PiecePosition> {
+        let value: BoardKey = value.into();
+        match value {
+            BoardKey::Piece(piece) => self.shallow_piece_position_piece(piece),
+            BoardKey::PieceWithPosition(piece) => self.shallow_piece_position_with_position(&piece),
+            BoardKey::Square(square) => self.shallow_piece_position_square(&square),
+            BoardKey::BoardValue(value) => self.deep_piece_position(&value),
+        }
+    }
+
+    #[inline]
+    pub fn shallow_piece_position_piece(
+        &self,
+        value: impl Into<PieceKind>,
+    ) -> Option<PiecePosition> {
+        self.shallow_get_piece(value).map(PiecePosition::from)
+    }
+
+    #[inline]
+    pub fn shallow_piece_position_with_position(
+        &self,
+        value: &PieceWithPosition,
+    ) -> Option<PiecePosition> {
+        self.shallow_get_piece_with_position(value)
+            .map(PiecePosition::from)
+    }
+
+    #[inline]
+    pub fn shallow_piece_position_square(&self, value: &Square) -> Option<PiecePosition> {
+        self.shallow_get_square(value).map(PiecePosition::from)
+    }
+
+    #[inline]
+    pub fn deep_piece_position(&self, value: &BoardValue) -> Option<PiecePosition> {
+        self.inner.get(value).map(PiecePosition::from)
+    }
+
+    #[inline]
+    pub fn get(&self, value: impl Into<BoardKey>) -> Option<&BoardValue> {
+        let value: BoardKey = value.into();
+        match value {
+            BoardKey::Piece(piece) => self.shallow_get_piece(piece),
+            BoardKey::PieceWithPosition(piece) => self.shallow_get_piece_with_position(&piece),
+            BoardKey::Square(square) => self.shallow_get_square(&square),
+            BoardKey::BoardValue(value) => self.deep_get(&value),
+        }
+    }
+
+    #[inline]
+    pub fn shallow_get_piece(&self, value: impl Into<PieceKind>) -> Option<&BoardValue> {
+        let value = value.into();
+        self.inner.iter().find(|x| x.eq_piece_kind(value))
+    }
+
+    #[inline]
+    pub fn shallow_get_piece_with_position(
+        &self,
+        value: &PieceWithPosition,
+    ) -> Option<&BoardValue> {
+        self.inner
+            .iter()
+            .find(|x| x.eq_piece_kind(value.kind) && x.eq_piece_position(value.position))
+    }
+
+    #[inline]
+    pub fn shallow_get_square(&self, value: &Square) -> Option<&BoardValue> {
+        self.inner.iter().find(|x| x.eq_square(value))
+    }
+
+    #[inline]
+    pub fn deep_get(&self, value: &BoardValue) -> Option<&BoardValue> {
+        self.inner.get(value)
+    }
+
+    #[inline]
+    pub fn insert(&mut self, value: BoardValue) -> bool {
+        self.inner.insert(value)
+    }
+
+    #[inline]
+    pub fn replace(&mut self, value: BoardValue) -> Option<BoardValue> {
+        self.inner.replace(value)
+    }
+
+    #[inline]
+    pub fn remove(&mut self, value: impl Into<BoardKey>) -> bool {
+        let value: BoardKey = value.into();
+        match value {
+            BoardKey::Piece(piece) => self.shallow_remove_piece(piece),
+            BoardKey::PieceWithPosition(piece) => self.shallow_remove_piece_with_position(&piece),
+            BoardKey::Square(square) => self.shallow_remove_square(&square),
+            BoardKey::BoardValue(value) => self.deep_remove(&value),
+        }
+    }
+
+    #[inline]
+    pub fn shallow_remove_piece(&mut self, value: impl Into<PieceKind>) -> bool {
+        let value = self.shallow_get_piece(value).cloned();
+        match value {
+            Some(x) => self.deep_remove(&x),
+            None => false,
+        }
+    }
+
+    #[inline]
+    pub fn shallow_remove_piece_with_position(&mut self, value: &PieceWithPosition) -> bool {
+        let value = self.shallow_get_piece_with_position(value).cloned();
+
+        match value {
+            Some(x) => self.deep_remove(&x),
+            None => false,
+        }
+    }
+
+    #[inline]
+    pub fn shallow_remove_square(&mut self, value: &Square) -> bool {
+        let value = self.shallow_get_square(value).cloned();
+        match value {
+            Some(x) => self.deep_remove(&x),
+            None => false,
+        }
+    }
+
+    #[inline]
+    pub fn deep_remove(&mut self, value: &BoardValue) -> bool {
+        self.inner.remove(value)
+    }
+
+    #[inline]
+    pub fn take(&mut self, value: impl Into<BoardKey>) -> Option<BoardValue> {
+        let value: BoardKey = value.into();
+        match value {
+            BoardKey::Piece(piece) => self.shallow_take_piece(piece),
+            BoardKey::PieceWithPosition(piece) => self.shallow_take_piece_with_position(&piece),
+            BoardKey::Square(square) => self.shallow_take_square(&square),
+            BoardKey::BoardValue(value) => self.deep_take(&value),
+        }
+    }
+
+    #[inline]
+    pub fn shallow_take_piece(&mut self, value: impl Into<PieceKind>) -> Option<BoardValue> {
+        self.shallow_get_piece(value)
+            .cloned()
+            .and_then(|x| self.deep_take(&x))
+    }
+
+    #[inline]
+    pub fn shallow_take_piece_with_position(
+        &mut self,
+        value: &PieceWithPosition,
+    ) -> Option<BoardValue> {
+        self.shallow_get_piece_with_position(value)
+            .cloned()
+            .and_then(|x| self.deep_take(&x))
+    }
+
+    #[inline]
+    pub fn shallow_take_square(&mut self, value: &Square) -> Option<BoardValue> {
+        self.shallow_get_square(value)
+            .cloned()
+            .and_then(|x| self.deep_take(&x))
+    }
+
+    #[inline]
+    pub fn deep_take(&mut self, value: &BoardValue) -> Option<BoardValue> {
+        self.inner.take(value)
+    }
+
+    #[inline]
+    pub fn iter(&self) -> std::collections::hash_set::Iter<'_, BoardValue> {
+        self.inner.iter()
+    }
+}
+
+impl Default for Board {
+    #[inline]
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl IntoIterator for Board {
+    type Item = BoardValue;
+    type IntoIter = std::collections::hash_set::IntoIter<Self::Item>;
+
+    #[inline]
+    fn into_iter(self) -> Self::IntoIter {
+        self.inner.into_iter()
+    }
+}
+
+impl<'a> IntoIterator for &'a Board {
+    type Item = &'a BoardValue;
+    type IntoIter = std::collections::hash_set::Iter<'a, BoardValue>;
+
+    #[inline]
+    fn into_iter(self) -> Self::IntoIter {
+        self.iter()
+    }
+}
+
+#[derive(Debug, PartialEq, Eq, Hash, Clone)]
+pub enum BoardKey {
+    Piece(PieceKind),
+    PieceWithPosition(PieceWithPosition),
+    Square(Square),
+    BoardValue(BoardValue),
+}
+
+impl From<Piece> for BoardKey {
+    #[inline]
+    fn from(value: Piece) -> Self {
+        Self::Piece(value.into())
+    }
+}
+
+impl From<&Piece> for BoardKey {
+    #[inline]
+    fn from(value: &Piece) -> Self {
+        Self::Piece(value.into())
+    }
+}
+
+impl From<PieceWithColor> for BoardKey {
+    #[inline]
+    fn from(value: PieceWithColor) -> Self {
+        Self::Piece(value.into())
+    }
+}
+
+impl From<&PieceWithColor> for BoardKey {
+    #[inline]
+    fn from(value: &PieceWithColor) -> Self {
+        Self::Piece(value.into())
+    }
+}
+
+impl From<PieceKind> for BoardKey {
+    #[inline]
+    fn from(value: PieceKind) -> Self {
+        Self::Piece(value)
+    }
+}
+
+impl From<&PieceKind> for BoardKey {
+    #[inline]
+    fn from(value: &PieceKind) -> Self {
+        Self::Piece(*value)
+    }
+}
+
+impl From<PieceWithPosition> for BoardKey {
+    fn from(value: PieceWithPosition) -> Self {
+        Self::PieceWithPosition(value)
+    }
+}
+impl From<Square> for BoardKey {
+    fn from(value: Square) -> Self {
+        Self::Square(value)
+    }
+}
+
+impl From<&Square> for BoardKey {
+    fn from(value: &Square) -> Self {
+        Self::Square(*value)
+    }
+}
+
+impl From<BoardValue> for BoardKey {
+    #[inline]
+    fn from(value: BoardValue) -> Self {
+        Self::BoardValue(value)
+    }
+}
+
+impl From<&BoardValue> for BoardKey {
+    #[inline]
+    fn from(value: &BoardValue) -> Self {
+        Self::BoardValue(value.clone())
+    }
+}
+
+#[derive(Debug, PartialEq, Eq, Hash, Clone, Copy)]
+pub enum PiecePosition {
+    Field,
+    Stand,
+    Outside,
+}
+
+impl From<BoardValue> for PiecePosition {
+    #[inline]
+    #[rustfmt::skip]
+    fn from(value: BoardValue) -> Self {
+        match value {
+            BoardValue::Field { piece: _, square: _ } => PiecePosition::Field,
+            BoardValue::Stand { piece: _, count: _ } => PiecePosition::Stand,
+            BoardValue::Outside { piece: _, count: _ } => PiecePosition::Outside,
+        }
+    }
+}
+
+impl From<&BoardValue> for PiecePosition {
+    #[inline]
+    #[rustfmt::skip]
+    fn from(value: &BoardValue) -> Self {
+        match value {
+            BoardValue::Field { piece: _, square: _ } => PiecePosition::Field,
+            BoardValue::Stand { piece: _, count: _ } => PiecePosition::Stand,
+            BoardValue::Outside { piece: _, count: _ } => PiecePosition::Outside,
+        }
+    }
+}
+
+#[derive(Debug, PartialEq, Eq, Hash, Clone, Copy)]
+pub struct PieceWithPosition {
+    kind: PieceKind,
+    position: PiecePosition,
+}
+
+impl PieceWithPosition {
+    #[inline]
+    fn new(kind: impl Into<PieceKind>, position: PiecePosition) -> Self {
+        Self {
+            kind: kind.into(),
+            position,
+        }
+    }
+}
 
 #[derive(Debug, PartialEq, Eq, Hash, Clone)]
 pub enum BoardValue {
@@ -56,6 +528,29 @@ impl BoardValue {
     #[inline]
     pub fn shallow_hash<H: std::hash::Hasher>(&self, state: &mut H) {
         ShallowBoardValue(self).hash(state);
+    }
+
+    #[inline]
+    pub fn eq_piece_kind(&self, value: impl Into<PieceKind>) -> bool {
+        let value = value.into();
+        match self {
+            BoardValue::Field { piece, square: _ } => value == piece.into(),
+            BoardValue::Stand { piece, count: _ } => value == piece.into(),
+            BoardValue::Outside { piece, count: _ } => value == piece.into(),
+        }
+    }
+
+    #[inline]
+    pub fn eq_piece_position(&self, value: PiecePosition) -> bool {
+        PiecePosition::from(self) == value
+    }
+
+    #[inline]
+    pub fn eq_square(&self, value: &Square) -> bool {
+        match self {
+            BoardValue::Field { piece: _, square } => value == square,
+            _ => false,
+        }
     }
 }
 
@@ -141,160 +636,6 @@ impl Deref for ShallowBoardValue<'_> {
     #[inline]
     fn deref(&self) -> &Self::Target {
         self.0
-    }
-}
-
-pub trait BoardImpl {
-    #[inline]
-    fn new_board() -> Board {
-        Board::with_capacity(40)
-    }
-
-    fn field(&self) -> HashMap<Square, PieceWithColor>;
-    fn stand(&self) -> HashMap<PieceWithColor, PieceCount>;
-    fn outside(&self) -> HashMap<Piece, PieceCount>;
-    fn update(&mut self, value: &BoardValue, update_value: BoardValue) -> bool;
-    fn piece_count(&self) -> PieceCount;
-    fn find_piece(&self, piece: impl Into<PieceKind>) -> HashSet<BoardValue>;
-    fn filter_field(&self) -> HashSet<BoardValue>;
-    fn filter_stand(&self) -> HashSet<BoardValue>;
-    fn filter_outside(&self) -> HashSet<BoardValue>;
-    fn shallow_contains(&self, value: &BoardValue) -> bool;
-    fn shallow_get(&self, value: &BoardValue) -> Option<&BoardValue>;
-    fn shallow_take(&mut self, value: &BoardValue) -> Option<BoardValue>;
-    fn shallow_insert(&mut self, value: BoardValue) -> bool;
-    fn shallow_update(&mut self, value: &BoardValue, update_value: BoardValue) -> bool;
-}
-
-impl BoardImpl for Board {
-    fn field(&self) -> HashMap<Square, PieceWithColor> {
-        self.iter()
-            .filter_map(|x| match x {
-                BoardValue::Field { square, piece } => Some((*square, *piece)),
-                _ => None,
-            })
-            .collect()
-    }
-
-    fn stand(&self) -> HashMap<PieceWithColor, PieceCount> {
-        self.iter()
-            .filter_map(|x| match x {
-                BoardValue::Stand { piece, count } => Some((*piece, *count)),
-                _ => None,
-            })
-            .collect()
-    }
-
-    fn outside(&self) -> HashMap<Piece, PieceCount> {
-        self.iter()
-            .filter_map(|x| match x {
-                BoardValue::Outside { piece, count } => Some((*piece, *count)),
-                _ => None,
-            })
-            .collect()
-    }
-
-    fn update(&mut self, value: &BoardValue, update_value: BoardValue) -> bool {
-        if self.contains(value) {
-            self.remove(value) && self.insert(update_value)
-        } else {
-            false
-        }
-    }
-
-    fn piece_count(&self) -> PieceCount {
-        self.iter()
-            .map(|x| match x {
-                BoardValue::Field {
-                    piece: _,
-                    square: _,
-                } => 1,
-                BoardValue::Stand { piece: _, count } => *count,
-                BoardValue::Outside { piece: _, count } => *count,
-            })
-            .sum()
-    }
-
-    fn find_piece(&self, piece: impl Into<PieceKind>) -> HashSet<BoardValue> {
-        let target_piece: PieceKind = piece.into();
-        let target_piece = target_piece.piece();
-
-        self.iter()
-            .filter(|x| match x {
-                BoardValue::Field { piece, square: _ } => piece.piece() == target_piece,
-                BoardValue::Stand { piece, count: _ } => piece.piece() == target_piece,
-                BoardValue::Outside { piece, count: _ } => piece == target_piece,
-            })
-            .cloned()
-            .collect()
-    }
-
-    fn filter_field(&self) -> HashSet<BoardValue> {
-        self.iter()
-            .filter(|x| matches!(x, BoardValue::Field { .. }))
-            .cloned()
-            .collect()
-    }
-
-    fn filter_stand(&self) -> HashSet<BoardValue> {
-        self.iter()
-            .filter(|x| matches!(x, BoardValue::Stand { .. }))
-            .cloned()
-            .collect()
-    }
-
-    fn filter_outside(&self) -> HashSet<BoardValue> {
-        self.iter()
-            .filter(|x| matches!(x, BoardValue::Outside { .. }))
-            .cloned()
-            .collect()
-    }
-
-    fn shallow_contains(&self, value: &BoardValue) -> bool {
-        let value = ShallowBoardValue(value);
-        self.iter().any(|x| value == ShallowBoardValue(x))
-    }
-
-    fn shallow_get(&self, value: &BoardValue) -> Option<&BoardValue> {
-        let value = ShallowBoardValue(value);
-        self.iter().find(move |x| value == ShallowBoardValue(x))
-    }
-
-    fn shallow_take(&mut self, value: &BoardValue) -> Option<BoardValue> {
-        self.replace(value)
-        let value = self.shallow_get(value);
-
-        if let Some(value) = value {
-            self.take(value)
-        } else {
-            None
-        }
-        // let value = {
-        //     let shallow = ShallowBoardValue(&value);
-        //     self.iter().find(move |x| shallow == ShallowBoardValue(x))
-        // };
-        // if let Some(value) = value {
-        //     self.take(value)
-        // } else {
-        //     None
-        // }
-        // value.and_then(move |x| self.take(&x.clone()))
-    }
-
-    fn shallow_insert(&mut self, value: BoardValue) -> bool {
-        if let Some(target) = self.shallow_take(&value) {
-            self.remove(&target) && self.insert(value)
-        } else {
-            false
-        }
-    }
-
-    fn shallow_update(&mut self, value: &BoardValue, update_value: BoardValue) -> bool {
-        if let Some(value) = self.shallow_take(&value) {
-            self.remove(&value) && self.insert(update_value)
-        } else {
-            false
-        }
     }
 }
 
