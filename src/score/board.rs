@@ -431,18 +431,19 @@ impl BoardType {
                 Square::new_unchecked(x, y),
             );
 
-            if !board.remove(&field) {
+            if !board.remove(field) {
                 unreachable!();
             }
 
             if let Some(BoardValue::Outside { piece, count }) =
-                board.shallow_take(&BoardValue::Outside { piece, count: 0 })
+                board.take(PieceWithPosition::new(piece, PiecePosition::Outside))
             {
                 let outside = BoardValue::new_outside(piece, count + 1);
-                board.remove(&outside);
-                board.insert(outside);
-            } else {
-                board.insert(BoardValue::new_outside(piece, 1));
+                if !board.insert(outside) {
+                    unreachable!()
+                }
+            } else if !board.insert(BoardValue::new_outside(piece, 1)) {
+                unreachable!()
             }
         }
 
