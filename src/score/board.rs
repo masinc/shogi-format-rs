@@ -1070,6 +1070,61 @@ mod tests {
     }
 
     #[test]
+    fn board_filter_() {
+        let mut board = Board::new();
+        assert!(board.insert(BoardValue::new_field(
+            PieceWithColor::new_white(UnpromotedPiece::Pawn),
+            Square::new_unchecked(9, 3)
+        )));
+
+        assert!(board.insert(BoardValue::new_field(
+            PieceWithColor::new_black(UnpromotedPiece::Pawn),
+            Square::new_unchecked(9, 7)
+        )));
+
+        assert!(board.insert(BoardValue::new_stand(
+            PieceWithColor::new_white(UnpromotedPiece::Pawn),
+            2
+        )));
+
+        assert!(board.insert(BoardValue::new_stand(
+            PieceWithColor::new_black(UnpromotedPiece::Rook),
+            2
+        )));
+
+        assert!(board.insert(BoardValue::new_outside(UnpromotedPiece::Pawn, 3)));
+        assert!(board.insert(BoardValue::new_outside(UnpromotedPiece::King, 1)));
+
+        let field = board.filter_field();
+        assert_eq!(field.len(), 2);
+        assert!(field.contains(&BoardValue::new_field(
+            PieceWithColor::new_black(UnpromotedPiece::Pawn),
+            Square::new_unchecked(9, 7)
+        )));
+        assert!(field.contains(&BoardValue::new_field(
+            PieceWithColor::new_white(UnpromotedPiece::Pawn),
+            Square::new_unchecked(9, 3)
+        )));
+
+        let stand = board.filter_stand();
+        assert_eq!(stand.len(), 2);
+        assert!(stand.contains(&BoardValue::new_stand(
+            PieceWithColor::new_white(UnpromotedPiece::Pawn),
+            2
+        )));
+        assert!(stand.contains(&BoardValue::new_stand(
+            PieceWithColor::new_black(UnpromotedPiece::Rook),
+            2
+        )));
+
+        let outside = board.filter_outside();
+        assert_eq!(outside.len(), 2);
+
+        assert!(outside.contains(&BoardValue::new_outside(UnpromotedPiece::Pawn, 3)));
+        assert!(outside.contains(&BoardValue::new_outside(UnpromotedPiece::King, 1)));
+    }
+
+    #[test]
     fn board_value_new_field() {
         assert_eq!(
             BoardValue::new_field(
