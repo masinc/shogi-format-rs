@@ -836,50 +836,7 @@ mod tests {
     use super::*;
     use std::{collections::hash_map::DefaultHasher, hash::Hasher};
 
-    #[test]
-    fn board_capacity() {
-        assert!(Board::new().capacity() >= 40);
-        assert!(Board::with_capacity(30).capacity() >= 30);
-    }
-
-    #[test]
-    fn board_field() {
-        assert_eq!(Board::new().field(), HashMap::new());
-
-        let mut board = Board::new();
-        assert!(board.insert(BoardValue::new_field(
-            PieceWithColor::new_white(UnpromotedPiece::Pawn),
-            Square::new_unchecked(9, 3)
-        )));
-
-        assert!(board.insert(BoardValue::new_field(
-            PieceWithColor::new_black(UnpromotedPiece::Pawn),
-            Square::new_unchecked(9, 7)
-        )));
-
-        assert!(board.insert(BoardValue::new_stand(
-            PieceWithColor::new_white(UnpromotedPiece::Pawn),
-            2
-        )));
-
-        assert!(board.insert(BoardValue::new_outside(UnpromotedPiece::Pawn, 3)));
-
-        let field = board.field();
-        assert_eq!(field.len(), 2);
-        assert_eq!(
-            field.get(&Square::new_unchecked(9, 3)),
-            Some(&PieceWithColor::new_white(UnpromotedPiece::Pawn))
-        );
-        assert_eq!(
-            field.get(&Square::new_unchecked(9, 7)),
-            Some(&PieceWithColor::new_black(UnpromotedPiece::Pawn))
-        );
-    }
-
-    #[test]
-    pub fn board_stand() {
-        assert_eq!(Board::new().stand(), HashMap::new());
-
+    fn make_test_board() -> Board {
         let mut board = Board::new();
         assert!(board.insert(BoardValue::new_field(
             PieceWithColor::new_white(UnpromotedPiece::Pawn),
@@ -902,7 +859,39 @@ mod tests {
         )));
 
         assert!(board.insert(BoardValue::new_outside(UnpromotedPiece::Pawn, 3)));
+        assert!(board.insert(BoardValue::new_outside(UnpromotedPiece::King, 1)));
 
+        board
+    }
+
+    #[test]
+    fn board_capacity() {
+        assert!(Board::new().capacity() >= 40);
+        assert!(Board::with_capacity(30).capacity() >= 30);
+    }
+
+    #[test]
+    fn board_field() {
+        assert_eq!(Board::new().field(), HashMap::new());
+
+        let board = make_test_board();
+        let field = board.field();
+        assert_eq!(field.len(), 2);
+        assert_eq!(
+            field.get(&Square::new_unchecked(9, 3)),
+            Some(&PieceWithColor::new_white(UnpromotedPiece::Pawn))
+        );
+        assert_eq!(
+            field.get(&Square::new_unchecked(9, 7)),
+            Some(&PieceWithColor::new_black(UnpromotedPiece::Pawn))
+        );
+    }
+
+    #[test]
+    pub fn board_stand() {
+        assert_eq!(Board::new().stand(), HashMap::new());
+
+        let board = make_test_board();
         let stand = board.stand();
         assert_eq!(stand.len(), 2);
         assert_eq!(
@@ -920,30 +909,7 @@ mod tests {
     pub fn board_outside() {
         assert_eq!(Board::new().outside(), HashMap::new());
 
-        let mut board = Board::new();
-        assert!(board.insert(BoardValue::new_field(
-            PieceWithColor::new_white(UnpromotedPiece::Pawn),
-            Square::new_unchecked(9, 3)
-        )));
-
-        assert!(board.insert(BoardValue::new_field(
-            PieceWithColor::new_black(UnpromotedPiece::Pawn),
-            Square::new_unchecked(9, 7)
-        )));
-
-        assert!(board.insert(BoardValue::new_stand(
-            PieceWithColor::new_white(UnpromotedPiece::Pawn),
-            2
-        )));
-
-        assert!(board.insert(BoardValue::new_stand(
-            PieceWithColor::new_black(UnpromotedPiece::Rook),
-            2
-        )));
-
-        assert!(board.insert(BoardValue::new_outside(UnpromotedPiece::Pawn, 3)));
-        assert!(board.insert(BoardValue::new_outside(UnpromotedPiece::King, 1)));
-
+        let board = make_test_board();
         let outside = board.outside();
         assert_eq!(outside.len(), 2);
         assert_eq!(outside.get(&UnpromotedPiece::Pawn.into()), Some(&3));
@@ -954,59 +920,13 @@ mod tests {
     fn board_piece_count() {
         assert_eq!(Board::new().piece_count(), 0);
 
-        let mut board = Board::new();
-        assert!(board.insert(BoardValue::new_field(
-            PieceWithColor::new_white(UnpromotedPiece::Pawn),
-            Square::new_unchecked(9, 3)
-        )));
-
-        assert!(board.insert(BoardValue::new_field(
-            PieceWithColor::new_black(UnpromotedPiece::Pawn),
-            Square::new_unchecked(9, 7)
-        )));
-
-        assert!(board.insert(BoardValue::new_stand(
-            PieceWithColor::new_white(UnpromotedPiece::Pawn),
-            2
-        )));
-
-        assert!(board.insert(BoardValue::new_stand(
-            PieceWithColor::new_black(UnpromotedPiece::Rook),
-            2
-        )));
-
-        assert!(board.insert(BoardValue::new_outside(UnpromotedPiece::Pawn, 3)));
-        assert!(board.insert(BoardValue::new_outside(UnpromotedPiece::King, 1)));
-
+        let board = make_test_board();
         assert_eq!(board.piece_count(), 10);
     }
 
     #[test]
     fn board_find_piece() {
-        let mut board = Board::new();
-        assert!(board.insert(BoardValue::new_field(
-            PieceWithColor::new_white(UnpromotedPiece::Pawn),
-            Square::new_unchecked(9, 3)
-        )));
-
-        assert!(board.insert(BoardValue::new_field(
-            PieceWithColor::new_black(UnpromotedPiece::Pawn),
-            Square::new_unchecked(9, 7)
-        )));
-
-        assert!(board.insert(BoardValue::new_stand(
-            PieceWithColor::new_white(UnpromotedPiece::Pawn),
-            2
-        )));
-
-        assert!(board.insert(BoardValue::new_stand(
-            PieceWithColor::new_black(UnpromotedPiece::Rook),
-            2
-        )));
-
-        assert!(board.insert(BoardValue::new_outside(UnpromotedPiece::Pawn, 3)));
-        assert!(board.insert(BoardValue::new_outside(UnpromotedPiece::King, 1)));
-
+        let mut board = make_test_board();
         let values = board.find_piece(UnpromotedPiece::Pawn);
         assert_eq!(values.len(), 4);
 
@@ -1033,29 +953,7 @@ mod tests {
 
     #[test]
     fn board_filter_() {
-        let mut board = Board::new();
-        assert!(board.insert(BoardValue::new_field(
-            PieceWithColor::new_white(UnpromotedPiece::Pawn),
-            Square::new_unchecked(9, 3)
-        )));
-
-        assert!(board.insert(BoardValue::new_field(
-            PieceWithColor::new_black(UnpromotedPiece::Pawn),
-            Square::new_unchecked(9, 7)
-        )));
-
-        assert!(board.insert(BoardValue::new_stand(
-            PieceWithColor::new_white(UnpromotedPiece::Pawn),
-            2
-        )));
-
-        assert!(board.insert(BoardValue::new_stand(
-            PieceWithColor::new_black(UnpromotedPiece::Rook),
-            2
-        )));
-
-        assert!(board.insert(BoardValue::new_outside(UnpromotedPiece::Pawn, 3)));
-        assert!(board.insert(BoardValue::new_outside(UnpromotedPiece::King, 1)));
+        let board = make_test_board();
 
         let field = board.filter_field();
         assert_eq!(field.len(), 2);
@@ -1088,29 +986,7 @@ mod tests {
 
     #[test]
     fn board_contains() {
-        let mut board = Board::new();
-        assert!(board.insert(BoardValue::new_field(
-            PieceWithColor::new_white(UnpromotedPiece::Pawn),
-            Square::new_unchecked(9, 3)
-        )));
-
-        assert!(board.insert(BoardValue::new_field(
-            PieceWithColor::new_black(UnpromotedPiece::Pawn),
-            Square::new_unchecked(9, 7)
-        )));
-
-        assert!(board.insert(BoardValue::new_stand(
-            PieceWithColor::new_white(UnpromotedPiece::Pawn),
-            2
-        )));
-
-        assert!(board.insert(BoardValue::new_stand(
-            PieceWithColor::new_black(UnpromotedPiece::Rook),
-            2
-        )));
-
-        assert!(board.insert(BoardValue::new_outside(UnpromotedPiece::Pawn, 3)));
-        assert!(board.insert(BoardValue::new_outside(UnpromotedPiece::King, 1)));
+        let board = make_test_board();
 
         // PieceKind
         assert!(board.contains(PieceKind::new_black(UnpromotedPiece::Pawn)));
@@ -1201,30 +1077,7 @@ mod tests {
 
     #[test]
     fn board_get() {
-        let mut board = Board::new();
-        assert!(board.insert(BoardValue::new_field(
-            PieceWithColor::new_white(UnpromotedPiece::Pawn),
-            Square::new_unchecked(9, 3)
-        )));
-
-        assert!(board.insert(BoardValue::new_field(
-            PieceWithColor::new_black(UnpromotedPiece::Pawn),
-            Square::new_unchecked(9, 7)
-        )));
-
-        assert!(board.insert(BoardValue::new_stand(
-            PieceWithColor::new_white(UnpromotedPiece::Pawn),
-            2
-        )));
-
-        assert!(board.insert(BoardValue::new_stand(
-            PieceWithColor::new_black(UnpromotedPiece::Rook),
-            2
-        )));
-
-        assert!(board.insert(BoardValue::new_outside(UnpromotedPiece::Pawn, 3)));
-        assert!(board.insert(BoardValue::new_outside(UnpromotedPiece::King, 1)));
-
+        let board = make_test_board();
         // PieceKind
         assert_eq!(
             board.get(PieceKind::new_black(UnpromotedPiece::Bishop)),
