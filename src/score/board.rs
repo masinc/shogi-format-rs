@@ -955,6 +955,40 @@ mod tests {
     }
 
     #[test]
+    pub fn board_outside() {
+        assert_eq!(Board::new().outside(), HashMap::new());
+
+        let mut board = Board::new();
+        assert!(board.insert(BoardValue::new_field(
+            PieceWithColor::new_white(UnpromotedPiece::Pawn),
+            Square::new_unchecked(9, 3)
+        )));
+
+        assert!(board.insert(BoardValue::new_field(
+            PieceWithColor::new_black(UnpromotedPiece::Pawn),
+            Square::new_unchecked(9, 7)
+        )));
+
+        assert!(board.insert(BoardValue::new_stand(
+            PieceWithColor::new_white(UnpromotedPiece::Pawn),
+            2
+        )));
+
+        assert!(board.insert(BoardValue::new_stand(
+            PieceWithColor::new_black(UnpromotedPiece::Rook),
+            2
+        )));
+
+        assert!(board.insert(BoardValue::new_outside(UnpromotedPiece::Pawn, 3)));
+        assert!(board.insert(BoardValue::new_outside(UnpromotedPiece::King, 1)));
+
+        let outside = board.outside();
+        assert_eq!(outside.len(), 2);
+        assert_eq!(outside.get(&UnpromotedPiece::Pawn.into()), Some(&3));
+        assert_eq!(outside.get(&UnpromotedPiece::King.into()), Some(&1));
+    }
+
+    #[test]
     fn board_value_new_field() {
         assert_eq!(
             BoardValue::new_field(
