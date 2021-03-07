@@ -1200,6 +1200,193 @@ mod tests {
     }
 
     #[test]
+    fn board_get() {
+        let mut board = Board::new();
+        assert!(board.insert(BoardValue::new_field(
+            PieceWithColor::new_white(UnpromotedPiece::Pawn),
+            Square::new_unchecked(9, 3)
+        )));
+
+        assert!(board.insert(BoardValue::new_field(
+            PieceWithColor::new_black(UnpromotedPiece::Pawn),
+            Square::new_unchecked(9, 7)
+        )));
+
+        assert!(board.insert(BoardValue::new_stand(
+            PieceWithColor::new_white(UnpromotedPiece::Pawn),
+            2
+        )));
+
+        assert!(board.insert(BoardValue::new_stand(
+            PieceWithColor::new_black(UnpromotedPiece::Rook),
+            2
+        )));
+
+        assert!(board.insert(BoardValue::new_outside(UnpromotedPiece::Pawn, 3)));
+        assert!(board.insert(BoardValue::new_outside(UnpromotedPiece::King, 1)));
+
+        // PieceKind
+        assert_eq!(
+            board.get(PieceKind::new_black(UnpromotedPiece::Bishop)),
+            None
+        );
+
+        assert_eq!(board.get(PieceKind::new_black(UnpromotedPiece::King)), None);
+
+        // PieceWithPosition
+        assert_eq!(
+            board.get(PieceWithPosition::new(
+                PieceKind::new_black(UnpromotedPiece::Pawn),
+                PiecePosition::Field
+            )),
+            Some(&BoardValue::new_field(
+                PieceWithColor::new_black(UnpromotedPiece::Pawn),
+                Square::new_unchecked(9, 7)
+            ))
+        );
+
+        assert_eq!(
+            board.get(PieceWithPosition::new(
+                PieceKind::new_white(UnpromotedPiece::Pawn),
+                PiecePosition::Field
+            )),
+            Some(&BoardValue::new_field(
+                PieceWithColor::new_white(UnpromotedPiece::Pawn),
+                Square::new_unchecked(9, 3)
+            ))
+        );
+
+        assert_eq!(
+            board.get(PieceWithPosition::new(
+                PieceKind::new(UnpromotedPiece::Pawn),
+                PiecePosition::Field
+            )),
+            None
+        );
+
+        assert_eq!(
+            board.get(PieceWithPosition::new(
+                PieceKind::new_black(UnpromotedPiece::Rook),
+                PiecePosition::Field
+            )),
+            None
+        );
+
+        assert_eq!(
+            board.get(PieceWithPosition::new(
+                PieceKind::new(UnpromotedPiece::King),
+                PiecePosition::Field
+            )),
+            None
+        );
+
+        assert_eq!(
+            board.get(PieceWithPosition::new(
+                PieceKind::new_white(UnpromotedPiece::Pawn),
+                PiecePosition::Stand
+            )),
+            Some(&BoardValue::new_stand(
+                PieceWithColor::new_white(UnpromotedPiece::Pawn),
+                2
+            ))
+        );
+
+        assert_eq!(
+            board.get(PieceWithPosition::new(
+                PieceKind::new_black(UnpromotedPiece::Pawn),
+                PiecePosition::Stand
+            )),
+            None
+        );
+
+        assert_eq!(
+            board.get(PieceWithPosition::new(
+                PieceKind::new(UnpromotedPiece::Pawn),
+                PiecePosition::Stand
+            )),
+            None
+        );
+
+        assert_eq!(
+            board.get(PieceWithPosition::new(
+                PieceKind::new(UnpromotedPiece::King),
+                PiecePosition::Stand
+            )),
+            None
+        );
+
+        assert_eq!(
+            board.get(PieceWithPosition::new(
+                PieceKind::new(UnpromotedPiece::Pawn),
+                PiecePosition::Outside
+            )),
+            Some(&BoardValue::new_outside(UnpromotedPiece::Pawn, 3))
+        );
+
+        assert_eq!(
+            board.get(PieceWithPosition::new(
+                PieceKind::new(UnpromotedPiece::King),
+                PiecePosition::Outside
+            )),
+            Some(&BoardValue::new_outside(UnpromotedPiece::King, 1))
+        );
+
+        assert_eq!(
+            board.get(PieceWithPosition::new(
+                PieceKind::new_black(UnpromotedPiece::Pawn),
+                PiecePosition::Outside
+            )),
+            None
+        );
+
+        assert_eq!(
+            board.get(PieceWithPosition::new(
+                PieceKind::new_black(UnpromotedPiece::King),
+                PiecePosition::Outside
+            )),
+            None
+        );
+
+        // Square
+        assert_eq!(
+            board.get(Square::new_unchecked(9, 7)),
+            Some(&BoardValue::new_field(
+                PieceWithColor::new_black(UnpromotedPiece::Pawn),
+                Square::new_unchecked(9, 7)
+            ))
+        );
+        assert_eq!(
+            board.get(Square::new_unchecked(9, 3)),
+            Some(&BoardValue::new_field(
+                PieceWithColor::new_white(UnpromotedPiece::Pawn),
+                Square::new_unchecked(9, 3)
+            ))
+        );
+        assert_eq!(board.get(Square::new_unchecked(7, 9)), None);
+        assert_eq!(board.get(Square::new_unchecked(1, 1)), None);
+
+        // BoardValue
+        assert_eq!(
+            board.get(BoardValue::new_field(
+                PieceWithColor::new_white(UnpromotedPiece::Pawn),
+                Square::new_unchecked(9, 3)
+            )),
+            Some(&BoardValue::new_field(
+                PieceWithColor::new_white(UnpromotedPiece::Pawn),
+                Square::new_unchecked(9, 3)
+            ))
+        );
+
+        assert_eq!(
+            board.get(BoardValue::new_field(
+                PieceWithColor::new_white(UnpromotedPiece::Pawn),
+                Square::new_unchecked(9, 9)
+            )),
+            None
+        );
+    }
+
+    #[test]
     fn board_value_new_field() {
         assert_eq!(
             BoardValue::new_field(
