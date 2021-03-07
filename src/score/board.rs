@@ -15,7 +15,7 @@ use std::{
 pub type PieceCount = usize;
 
 type BoardInner = HashSet<BoardValue>;
-#[derive(PartialEq, Eq, Debug, Clone)]
+#[derive(PartialEq, Eq, Debug, Clone, Deserialize, Serialize)]
 pub struct Board {
     inner: BoardInner,
 }
@@ -327,7 +327,7 @@ impl<'a> IntoIterator for &'a Board {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, Hash, Clone)]
+#[derive(Debug, PartialEq, Eq, Hash, Clone, Deserialize, Serialize)]
 pub enum BoardKey {
     Piece(PieceKind),
     PieceWithPosition(PieceWithPosition),
@@ -408,7 +408,7 @@ impl From<&BoardValue> for BoardKey {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, Hash, Clone, Copy)]
+#[derive(Debug, PartialEq, Eq, Hash, Clone, Copy, Deserialize, Serialize)]
 pub enum PiecePosition {
     Field,
     Stand,
@@ -439,7 +439,7 @@ impl From<&BoardValue> for PiecePosition {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, Hash, Clone, Copy)]
+#[derive(Debug, PartialEq, Eq, Hash, Clone, Copy, Deserialize, Serialize)]
 pub struct PieceWithPosition {
     kind: PieceKind,
     position: PiecePosition,
@@ -455,7 +455,7 @@ impl PieceWithPosition {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, Hash, Clone)]
+#[derive(Debug, PartialEq, Eq, Hash, Clone, Deserialize, Serialize)]
 pub enum BoardValue {
     Field {
         piece: PieceWithColor,
@@ -615,7 +615,7 @@ impl Deref for ShallowBoardValue<'_> {
     }
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Deserialize, Serialize)]
 pub enum Handicap {
     Rook,
     Bishop,
@@ -627,7 +627,7 @@ pub enum Handicap {
     SixPiece,
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
 pub enum BoardType {
     Even,
     Blank,
