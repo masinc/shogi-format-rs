@@ -915,6 +915,46 @@ mod tests {
     }
 
     #[test]
+    pub fn board_stand() {
+        assert_eq!(Board::new().stand(), HashMap::new());
+
+        let mut board = Board::new();
+        assert!(board.insert(BoardValue::new_field(
+            PieceWithColor::new_white(UnpromotedPiece::Pawn),
+            Square::new_unchecked(9, 3)
+        )));
+
+        assert!(board.insert(BoardValue::new_field(
+            PieceWithColor::new_black(UnpromotedPiece::Pawn),
+            Square::new_unchecked(9, 7)
+        )));
+
+        assert!(board.insert(BoardValue::new_stand(
+            PieceWithColor::new_white(UnpromotedPiece::Pawn),
+            2
+        )));
+
+        assert!(board.insert(BoardValue::new_stand(
+            PieceWithColor::new_black(UnpromotedPiece::Rook),
+            2
+        )));
+
+        assert!(board.insert(BoardValue::new_outside(UnpromotedPiece::Pawn, 3)));
+
+        let stand = board.stand();
+        assert_eq!(stand.len(), 2);
+        assert_eq!(
+            stand.get(&PieceWithColor::new_black(UnpromotedPiece::Rook)),
+            Some(&2)
+        );
+
+        assert_eq!(
+            stand.get(&PieceWithColor::new_white(UnpromotedPiece::Pawn)),
+            Some(&2)
+        );
+    }
+
+    #[test]
     fn board_value_new_field() {
         assert_eq!(
             BoardValue::new_field(
