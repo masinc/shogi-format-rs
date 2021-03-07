@@ -47,3 +47,20 @@ pub struct Tree {
     metadata: TreeMetadata,
     branches: Vec<Branch>,
 }
+
+impl Tree {
+    #[inline]
+    pub fn new() -> Self {
+        Self::default()
+    }
+}
+
+impl Default for Tree {
+    #[inline]
+    fn default() -> Self {
+        Self {
+            metadata: Default::default(),
+            branches: vec![],
+        }
+    }
+}
