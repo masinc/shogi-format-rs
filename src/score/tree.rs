@@ -28,6 +28,7 @@ impl TreeMetadata {
 }
 
 impl Default for TreeMetadata {
+    #[inline]
     fn default() -> Self {
         Self {
             initial_board: BoardType::Even,
