@@ -880,6 +880,38 @@ mod tests {
         assert!(Board::with_capacity(30).capacity() >= 30);
     }
 
+    #[test]
+    fn board_field() {
+        assert_eq!(Board::new().field(), HashMap::new());
+
+        let mut board = Board::new();
+        assert!(board.insert(BoardValue::new_field(
+            PieceWithColor::new_white(UnpromotedPiece::Pawn),
+            Square::new_unchecked(9, 3)
+        )));
+
+        assert!(board.insert(BoardValue::new_field(
+            PieceWithColor::new_black(UnpromotedPiece::Pawn),
+            Square::new_unchecked(9, 7)
+        )));
+
+        assert!(board.insert(BoardValue::new_stand(
+            PieceWithColor::new_white(UnpromotedPiece::Pawn),
+            2
+        )));
+
+        assert!(board.insert(BoardValue::new_outside(UnpromotedPiece::Pawn, 3)));
+
+        let field = board.field();
+        assert_eq!(field.len(), 2);
+        assert_eq!(
+            field.get(&Square::new_unchecked(9, 3)),
+            Some(&PieceWithColor::new_white(UnpromotedPiece::Pawn))
+        );
+        assert_eq!(
+            field.get(&Square::new_unchecked(9, 7)),
+            Some(&PieceWithColor::new_black(UnpromotedPiece::Pawn))
+        );
     }
 
     #[test]
