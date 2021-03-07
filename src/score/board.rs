@@ -926,7 +926,7 @@ mod tests {
 
     #[test]
     fn board_find_piece() {
-        let mut board = make_test_board();
+        let board = make_test_board();
         let values = board.find_piece(UnpromotedPiece::Pawn);
         assert_eq!(values.len(), 4);
 
