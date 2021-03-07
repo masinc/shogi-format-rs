@@ -164,44 +164,6 @@ impl Board {
     }
 
     #[inline]
-    pub fn piece_position(&self, value: impl Into<BoardKey>) -> Option<PiecePosition> {
-        let value: BoardKey = value.into();
-        match value {
-            BoardKey::Piece(piece) => self.shallow_piece_position_piece(piece),
-            BoardKey::PieceWithPosition(piece) => self.shallow_piece_position_with_position(&piece),
-            BoardKey::Square(square) => self.shallow_piece_position_square(&square),
-            BoardKey::BoardValue(value) => self.deep_piece_position(&value),
-        }
-    }
-
-    #[inline]
-    pub fn shallow_piece_position_piece(
-        &self,
-        value: impl Into<PieceKind>,
-    ) -> Option<PiecePosition> {
-        self.shallow_get_piece(value).map(PiecePosition::from)
-    }
-
-    #[inline]
-    pub fn shallow_piece_position_with_position(
-        &self,
-        value: &PieceWithPosition,
-    ) -> Option<PiecePosition> {
-        self.shallow_get_piece_with_position(value)
-            .map(PiecePosition::from)
-    }
-
-    #[inline]
-    pub fn shallow_piece_position_square(&self, value: &Square) -> Option<PiecePosition> {
-        self.shallow_get_square(value).map(PiecePosition::from)
-    }
-
-    #[inline]
-    pub fn deep_piece_position(&self, value: &BoardValue) -> Option<PiecePosition> {
-        self.inner.get(value).map(PiecePosition::from)
-    }
-
-    #[inline]
     pub fn get(&self, value: impl Into<BoardKey>) -> Option<&BoardValue> {
         let value: BoardKey = value.into();
         match value {
