@@ -511,18 +511,27 @@ pub enum BoardValue {
 
 impl BoardValue {
     #[inline]
-    pub fn new_field(piece: PieceWithColor, square: Square) -> Self {
-        Self::Field { piece, square }
+    pub fn new_field(piece: impl Into<PieceWithColor>, square: Square) -> Self {
+        Self::Field {
+            piece: piece.into(),
+            square,
+        }
     }
 
     #[inline]
-    pub fn new_stand(piece: PieceWithColor, count: PieceCount) -> Self {
-        Self::Stand { piece, count }
+    pub fn new_stand(piece: impl Into<PieceWithColor>, count: PieceCount) -> Self {
+        Self::Stand {
+            piece: piece.into(),
+            count,
+        }
     }
 
     #[inline]
-    pub fn new_outside(piece: Piece, count: PieceCount) -> Self {
-        Self::Outside { piece, count }
+    pub fn new_outside(piece: impl Into<Piece>, count: PieceCount) -> Self {
+        Self::Outside {
+            piece: piece.into(),
+            count,
+        }
     }
 
     #[inline]
@@ -901,7 +910,7 @@ mod tests {
     #[test]
     fn board_value_new_outside() {
         assert_eq!(
-            BoardValue::new_outside(UnpromotedPiece::Lance.into(), 2),
+            BoardValue::new_outside(UnpromotedPiece::Lance, 2),
             BoardValue::Outside {
                 piece: UnpromotedPiece::Lance.into(),
                 count: 2,
@@ -947,8 +956,7 @@ mod tests {
         let hasher_stand =
             BoardValue::new_stand(PieceWithColor::new_black(UnpromotedPiece::Pawn), 1)
                 .get_shallow_hash();
-        let hasher_outside =
-            BoardValue::new_outside(UnpromotedPiece::Pawn.into(), 1).get_shallow_hash();
+        let hasher_outside = BoardValue::new_outside(UnpromotedPiece::Pawn, 1).get_shallow_hash();
 
         assert_eq!(hasher1, hasher2);
         assert_ne!(hasher1, hasher3);
@@ -992,8 +1000,7 @@ mod tests {
         )
         .get_shallow_hash();
 
-        let hasher_outside =
-            BoardValue::new_outside(UnpromotedPiece::Pawn.into(), 1).get_shallow_hash();
+        let hasher_outside = BoardValue::new_outside(UnpromotedPiece::Pawn, 1).get_shallow_hash();
 
         assert_eq!(hasher1, hasher2);
         assert_ne!(hasher1, hasher3);
@@ -1020,10 +1027,10 @@ mod tests {
 
     #[test]
     fn board_value_hash_outside() {
-        let hasher1 = BoardValue::new_outside(UnpromotedPiece::Pawn.into(), 1).get_shallow_hash();
-        let hasher2 = BoardValue::new_outside(UnpromotedPiece::Pawn.into(), 8).get_shallow_hash();
-        let hasher3 = BoardValue::new_outside(PromotedPiece::Pawn.into(), 1).get_shallow_hash();
-        let hasher4 = BoardValue::new_outside(UnpromotedPiece::Rook.into(), 1).get_shallow_hash();
+        let hasher1 = BoardValue::new_outside(UnpromotedPiece::Pawn, 1).get_shallow_hash();
+        let hasher2 = BoardValue::new_outside(UnpromotedPiece::Pawn, 8).get_shallow_hash();
+        let hasher3 = BoardValue::new_outside(PromotedPiece::Pawn, 1).get_shallow_hash();
+        let hasher4 = BoardValue::new_outside(UnpromotedPiece::Rook, 1).get_shallow_hash();
 
         let hasher_field = BoardValue::new_field(
             PieceWithColor::new_black(UnpromotedPiece::Pawn),
@@ -1075,7 +1082,7 @@ mod tests {
         );
         let value_stand =
             BoardValue::new_stand(PieceWithColor::new_black(UnpromotedPiece::Pawn), 1);
-        let value_outside = BoardValue::new_outside(UnpromotedPiece::Pawn.into(), 1);
+        let value_outside = BoardValue::new_outside(UnpromotedPiece::Pawn, 1);
 
         assert_eq!(ShallowBoardValue(&value1), ShallowBoardValue(&value2));
         assert_ne!(ShallowBoardValue(&value1), ShallowBoardValue(&value3));
@@ -1107,7 +1114,7 @@ mod tests {
             PieceWithColor::new_black(UnpromotedPiece::Pawn),
             Square::new_unchecked(5, 5),
         );
-        let value_outside = BoardValue::new_outside(UnpromotedPiece::Pawn.into(), 1);
+        let value_outside = BoardValue::new_outside(UnpromotedPiece::Pawn, 1);
 
         assert_eq!(ShallowBoardValue(&value1), ShallowBoardValue(&value2));
         assert_ne!(ShallowBoardValue(&value1), ShallowBoardValue(&value3));
@@ -1135,10 +1142,10 @@ mod tests {
     #[test]
     #[rustfmt::skip]
     fn shallow_board_value_eq_outside() {
-        let value1 = BoardValue::new_outside(UnpromotedPiece::Pawn.into(), 1);
-        let value2 = BoardValue::new_outside(UnpromotedPiece::Pawn.into(), 8);
-        let value3 = BoardValue::new_outside(PromotedPiece::Pawn.into(), 1);
-        let value4 = BoardValue::new_outside(UnpromotedPiece::Rook.into(), 1);
+        let value1 = BoardValue::new_outside(UnpromotedPiece::Pawn, 1);
+        let value2 = BoardValue::new_outside(UnpromotedPiece::Pawn, 8);
+        let value3 = BoardValue::new_outside(PromotedPiece::Pawn, 1);
+        let value4 = BoardValue::new_outside(UnpromotedPiece::Rook, 1);
 
         let value_field = BoardValue::new_field(
             PieceWithColor::new_black(UnpromotedPiece::Pawn),
@@ -1242,14 +1249,14 @@ mod tests {
         assert_eq!(board.piece_count(), 40);
 
         let cases = [
-            BoardValue::new_outside(UnpromotedPiece::Pawn.into(), 18),
-            BoardValue::new_outside(UnpromotedPiece::Lance.into(), 4),
-            BoardValue::new_outside(UnpromotedPiece::Knight.into(), 4),
-            BoardValue::new_outside(UnpromotedPiece::Silver.into(), 4),
-            BoardValue::new_outside(UnpromotedPiece::Gold.into(), 4),
-            BoardValue::new_outside(UnpromotedPiece::Bishop.into(), 2),
-            BoardValue::new_outside(UnpromotedPiece::Rook.into(), 2),
-            BoardValue::new_outside(UnpromotedPiece::King.into(), 2),
+            BoardValue::new_outside(UnpromotedPiece::Pawn, 18),
+            BoardValue::new_outside(UnpromotedPiece::Lance, 4),
+            BoardValue::new_outside(UnpromotedPiece::Knight, 4),
+            BoardValue::new_outside(UnpromotedPiece::Silver, 4),
+            BoardValue::new_outside(UnpromotedPiece::Gold, 4),
+            BoardValue::new_outside(UnpromotedPiece::Bishop, 2),
+            BoardValue::new_outside(UnpromotedPiece::Rook, 2),
+            BoardValue::new_outside(UnpromotedPiece::King, 2),
         ];
 
         for case in cases.iter() {
@@ -1307,7 +1314,7 @@ mod tests {
             make_field(Black, 3, 7, UnpromotedPiece::Pawn),
             make_field(Black, 2, 7, UnpromotedPiece::Pawn),
             make_field(Black, 1, 7, UnpromotedPiece::Pawn),
-            BoardValue::new_outside(UnpromotedPiece::Rook.into(), 1),
+            BoardValue::new_outside(UnpromotedPiece::Rook, 1),
         ];
 
         for case in cases.iter() {
@@ -1365,7 +1372,7 @@ mod tests {
             make_field(Black, 3, 7, UnpromotedPiece::Pawn),
             make_field(Black, 2, 7, UnpromotedPiece::Pawn),
             make_field(Black, 1, 7, UnpromotedPiece::Pawn),
-            BoardValue::new_outside(UnpromotedPiece::Bishop.into(), 1),
+            BoardValue::new_outside(UnpromotedPiece::Bishop, 1),
         ];
 
         for case in cases.iter() {
@@ -1423,7 +1430,7 @@ mod tests {
             make_field(Black, 3, 7, UnpromotedPiece::Pawn),
             make_field(Black, 2, 7, UnpromotedPiece::Pawn),
             make_field(Black, 1, 7, UnpromotedPiece::Pawn),
-            BoardValue::new_outside(UnpromotedPiece::Lance.into(), 1),
+            BoardValue::new_outside(UnpromotedPiece::Lance, 1),
         ];
 
         for case in cases.iter() {
@@ -1481,8 +1488,8 @@ mod tests {
             make_field(Black, 3, 7, UnpromotedPiece::Pawn),
             make_field(Black, 2, 7, UnpromotedPiece::Pawn),
             make_field(Black, 1, 7, UnpromotedPiece::Pawn),
-            BoardValue::new_outside(UnpromotedPiece::Lance.into(), 1),
-            BoardValue::new_outside(UnpromotedPiece::Rook.into(), 1),
+            BoardValue::new_outside(UnpromotedPiece::Lance, 1),
+            BoardValue::new_outside(UnpromotedPiece::Rook, 1),
         ];
 
         for case in cases.iter() {
@@ -1540,8 +1547,8 @@ mod tests {
             make_field(Black, 3, 7, UnpromotedPiece::Pawn),
             make_field(Black, 2, 7, UnpromotedPiece::Pawn),
             make_field(Black, 1, 7, UnpromotedPiece::Pawn),
-            BoardValue::new_outside(UnpromotedPiece::Lance.into(), 1),
-            BoardValue::new_outside(UnpromotedPiece::Bishop.into(), 1),
+            BoardValue::new_outside(UnpromotedPiece::Lance, 1),
+            BoardValue::new_outside(UnpromotedPiece::Bishop, 1),
         ];
 
         for case in cases.iter() {
@@ -1599,8 +1606,8 @@ mod tests {
             make_field(Black, 3, 7, UnpromotedPiece::Pawn),
             make_field(Black, 2, 7, UnpromotedPiece::Pawn),
             make_field(Black, 1, 7, UnpromotedPiece::Pawn),
-            BoardValue::new_outside(UnpromotedPiece::Rook.into(), 1),
-            BoardValue::new_outside(UnpromotedPiece::Bishop.into(), 1),
+            BoardValue::new_outside(UnpromotedPiece::Rook, 1),
+            BoardValue::new_outside(UnpromotedPiece::Bishop, 1),
         ];
 
         for case in cases.iter() {
@@ -1658,9 +1665,9 @@ mod tests {
             make_field(Black, 3, 7, UnpromotedPiece::Pawn),
             make_field(Black, 2, 7, UnpromotedPiece::Pawn),
             make_field(Black, 1, 7, UnpromotedPiece::Pawn),
-            BoardValue::new_outside(UnpromotedPiece::Rook.into(), 1),
-            BoardValue::new_outside(UnpromotedPiece::Bishop.into(), 1),
-            BoardValue::new_outside(UnpromotedPiece::Lance.into(), 2),
+            BoardValue::new_outside(UnpromotedPiece::Rook, 1),
+            BoardValue::new_outside(UnpromotedPiece::Bishop, 1),
+            BoardValue::new_outside(UnpromotedPiece::Lance, 2),
         ];
 
         for case in cases.iter() {
@@ -1718,10 +1725,10 @@ mod tests {
             make_field(Black, 3, 7, UnpromotedPiece::Pawn),
             make_field(Black, 2, 7, UnpromotedPiece::Pawn),
             make_field(Black, 1, 7, UnpromotedPiece::Pawn),
-            BoardValue::new_outside(UnpromotedPiece::Rook.into(), 1),
-            BoardValue::new_outside(UnpromotedPiece::Bishop.into(), 1),
-            BoardValue::new_outside(UnpromotedPiece::Lance.into(), 2),
-            BoardValue::new_outside(UnpromotedPiece::Knight.into(), 2),
+            BoardValue::new_outside(UnpromotedPiece::Rook, 1),
+            BoardValue::new_outside(UnpromotedPiece::Bishop, 1),
+            BoardValue::new_outside(UnpromotedPiece::Lance, 2),
+            BoardValue::new_outside(UnpromotedPiece::Knight, 2),
         ];
 
         for case in cases.iter() {
