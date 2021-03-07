@@ -138,6 +138,7 @@ impl<'a> From<&'a BoardValue> for ShallowBoardValue<'a> {
 impl Deref for ShallowBoardValue<'_> {
     type Target = BoardValue;
 
+    #[inline]
     fn deref(&self) -> &Self::Target {
         self.0
     }
