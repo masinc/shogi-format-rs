@@ -7,16 +7,455 @@ use piece::{PieceNumber, PieceWithColor};
 use serde::{Deserialize, Serialize};
 use std::{
     collections::{HashMap, HashSet},
-    convert::TryInto,
     hash::Hash,
     mem,
     ops::Deref,
 };
 
-pub type Board = HashSet<BoardValue>;
 pub type PieceCount = usize;
 
-#[derive(Debug, PartialEq, Eq, Hash, Clone)]
+type BoardInner = HashSet<BoardValue>;
+#[derive(PartialEq, Eq, Debug, Clone, Deserialize, Serialize)]
+pub struct Board {
+    inner: BoardInner,
+}
+
+impl Board {
+    #[inline]
+    pub fn new() -> Self {
+        Self::with_capacity(40)
+    }
+
+    #[inline]
+    pub fn with_capacity(capacity: usize) -> Self {
+        Self {
+            inner: BoardInner::with_capacity(capacity),
+        }
+    }
+
+    #[inline]
+    pub fn capacity(&self) -> usize {
+        self.inner.capacity()
+    }
+
+    #[inline]
+    pub fn field(&self) -> HashMap<Square, PieceWithColor> {
+        self.iter()
+            .filter_map(|x| match x {
+                BoardValue::Field { square, piece } => Some((*square, *piece)),
+                _ => None,
+            })
+            .collect()
+    }
+
+    #[inline]
+    pub fn stand(&self) -> HashMap<PieceWithColor, PieceCount> {
+        self.iter()
+            .filter_map(|x| match x {
+                BoardValue::Stand { piece, count } => Some((*piece, *count)),
+                _ => None,
+            })
+            .collect()
+    }
+
+    #[inline]
+    pub fn outside(&self) -> HashMap<Piece, PieceCount> {
+        self.iter()
+            .filter_map(|x| match x {
+                BoardValue::Outside { piece, count } => Some((*piece, *count)),
+                _ => None,
+            })
+            .collect()
+    }
+
+    #[inline]
+    pub fn piece_count(&self) -> PieceCount {
+        self.iter()
+            .map(|x| match x {
+                BoardValue::Field {
+                    piece: _,
+                    square: _,
+                } => 1,
+                BoardValue::Stand { piece: _, count } => *count,
+                BoardValue::Outside { piece: _, count } => *count,
+            })
+            .sum()
+    }
+
+    pub fn find_piece(&self, piece: impl Into<PieceKind>) -> HashSet<BoardValue> {
+        let target_piece: PieceKind = piece.into();
+        let target_piece = target_piece.piece();
+
+        self.iter()
+            .filter(|x| match x {
+                BoardValue::Field { piece, square: _ } => piece.piece() == target_piece,
+                BoardValue::Stand { piece, count: _ } => piece.piece() == target_piece,
+                BoardValue::Outside { piece, count: _ } => piece == target_piece,
+            })
+            .cloned()
+            .collect()
+    }
+
+    #[inline]
+    pub fn filter_field(&self) -> HashSet<BoardValue> {
+        self.iter()
+            .filter(|x| matches!(x, BoardValue::Field { .. }))
+            .cloned()
+            .collect()
+    }
+
+    #[inline]
+    pub fn filter_stand(&self) -> HashSet<BoardValue> {
+        self.iter()
+            .filter(|x| matches!(x, BoardValue::Stand { .. }))
+            .cloned()
+            .collect()
+    }
+
+    #[inline]
+    pub fn filter_outside(&self) -> HashSet<BoardValue> {
+        self.iter()
+            .filter(|x| matches!(x, BoardValue::Outside { .. }))
+            .cloned()
+            .collect()
+    }
+
+    #[inline]
+    pub fn len(&self) -> usize {
+        self.inner.len()
+    }
+
+    #[inline]
+    pub fn is_empty(&self) -> bool {
+        self.inner.is_empty()
+    }
+
+    #[inline]
+    pub fn contains(&self, value: impl Into<BoardKey>) -> bool {
+        let value: BoardKey = value.into();
+        match value {
+            BoardKey::Piece(piece) => self.shallow_contains_piece(piece),
+            BoardKey::PieceWithPosition(piece) => self.shallow_contains_piece_with_position(&piece),
+            BoardKey::Square(square) => self.shallow_contains_square(&square),
+            BoardKey::BoardValue(value) => self.deep_contains(&value),
+        }
+    }
+
+    #[inline]
+    pub fn shallow_contains_piece(&self, value: impl Into<PieceKind>) -> bool {
+        let value = value.into();
+        self.iter().any(|x| x.eq_piece_kind(value))
+    }
+
+    #[inline]
+    pub fn shallow_contains_piece_with_position(&self, value: &PieceWithPosition) -> bool {
+        self.iter()
+            .any(|x| x.eq_piece_kind(value.kind) && x.eq_piece_position(value.position))
+    }
+
+    #[inline]
+    pub fn shallow_contains_square(&self, value: &Square) -> bool {
+        self.iter().any(|x| x.eq_square(value))
+    }
+
+    #[inline]
+    pub fn deep_contains(&self, value: &BoardValue) -> bool {
+        self.inner.contains(value)
+    }
+
+    #[inline]
+    pub fn get(&self, value: impl Into<BoardKey>) -> Option<&BoardValue> {
+        let value: BoardKey = value.into();
+        match value {
+            BoardKey::Piece(piece) => self.shallow_get_piece(piece),
+            BoardKey::PieceWithPosition(piece) => self.shallow_get_piece_with_position(&piece),
+            BoardKey::Square(square) => self.shallow_get_square(&square),
+            BoardKey::BoardValue(value) => self.deep_get(&value),
+        }
+    }
+
+    #[inline]
+    pub fn shallow_get_piece(&self, value: impl Into<PieceKind>) -> Option<&BoardValue> {
+        let value = value.into();
+        self.inner.iter().find(|x| x.eq_piece_kind(value))
+    }
+
+    #[inline]
+    pub fn shallow_get_piece_with_position(
+        &self,
+        value: &PieceWithPosition,
+    ) -> Option<&BoardValue> {
+        self.inner
+            .iter()
+            .find(|x| x.eq_piece_kind(value.kind) && x.eq_piece_position(value.position))
+    }
+
+    #[inline]
+    pub fn shallow_get_square(&self, value: &Square) -> Option<&BoardValue> {
+        self.inner.iter().find(|x| x.eq_square(value))
+    }
+
+    #[inline]
+    pub fn deep_get(&self, value: &BoardValue) -> Option<&BoardValue> {
+        self.inner.get(value)
+    }
+
+    #[inline]
+    pub fn insert(&mut self, value: BoardValue) -> bool {
+        self.inner.insert(value)
+    }
+
+    #[inline]
+    pub fn replace(&mut self, value: BoardValue) -> Option<BoardValue> {
+        self.inner.replace(value)
+    }
+
+    #[inline]
+    pub fn remove(&mut self, value: impl Into<BoardKey>) -> bool {
+        let value: BoardKey = value.into();
+        match value {
+            BoardKey::Piece(piece) => self.shallow_remove_piece(piece),
+            BoardKey::PieceWithPosition(piece) => self.shallow_remove_piece_with_position(&piece),
+            BoardKey::Square(square) => self.shallow_remove_square(&square),
+            BoardKey::BoardValue(value) => self.deep_remove(&value),
+        }
+    }
+
+    #[inline]
+    pub fn shallow_remove_piece(&mut self, value: impl Into<PieceKind>) -> bool {
+        let value = self.shallow_get_piece(value).cloned();
+        match value {
+            Some(x) => self.deep_remove(&x),
+            None => false,
+        }
+    }
+
+    #[inline]
+    pub fn shallow_remove_piece_with_position(&mut self, value: &PieceWithPosition) -> bool {
+        let value = self.shallow_get_piece_with_position(value).cloned();
+
+        match value {
+            Some(x) => self.deep_remove(&x),
+            None => false,
+        }
+    }
+
+    #[inline]
+    pub fn shallow_remove_square(&mut self, value: &Square) -> bool {
+        let value = self.shallow_get_square(value).cloned();
+        match value {
+            Some(x) => self.deep_remove(&x),
+            None => false,
+        }
+    }
+
+    #[inline]
+    pub fn deep_remove(&mut self, value: &BoardValue) -> bool {
+        self.inner.remove(value)
+    }
+
+    #[inline]
+    pub fn take(&mut self, value: impl Into<BoardKey>) -> Option<BoardValue> {
+        let value: BoardKey = value.into();
+        match value {
+            BoardKey::Piece(piece) => self.shallow_take_piece(piece),
+            BoardKey::PieceWithPosition(piece) => self.shallow_take_piece_with_position(&piece),
+            BoardKey::Square(square) => self.shallow_take_square(&square),
+            BoardKey::BoardValue(value) => self.deep_take(&value),
+        }
+    }
+
+    #[inline]
+    pub fn shallow_take_piece(&mut self, value: impl Into<PieceKind>) -> Option<BoardValue> {
+        self.shallow_get_piece(value)
+            .cloned()
+            .and_then(|x| self.deep_take(&x))
+    }
+
+    #[inline]
+    pub fn shallow_take_piece_with_position(
+        &mut self,
+        value: &PieceWithPosition,
+    ) -> Option<BoardValue> {
+        self.shallow_get_piece_with_position(value)
+            .cloned()
+            .and_then(|x| self.deep_take(&x))
+    }
+
+    #[inline]
+    pub fn shallow_take_square(&mut self, value: &Square) -> Option<BoardValue> {
+        self.shallow_get_square(value)
+            .cloned()
+            .and_then(|x| self.deep_take(&x))
+    }
+
+    #[inline]
+    pub fn deep_take(&mut self, value: &BoardValue) -> Option<BoardValue> {
+        self.inner.take(value)
+    }
+
+    #[inline]
+    pub fn iter(&self) -> std::collections::hash_set::Iter<'_, BoardValue> {
+        self.inner.iter()
+    }
+}
+
+impl Default for Board {
+    #[inline]
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl IntoIterator for Board {
+    type Item = BoardValue;
+    type IntoIter = std::collections::hash_set::IntoIter<Self::Item>;
+
+    #[inline]
+    fn into_iter(self) -> Self::IntoIter {
+        self.inner.into_iter()
+    }
+}
+
+impl<'a> IntoIterator for &'a Board {
+    type Item = &'a BoardValue;
+    type IntoIter = std::collections::hash_set::Iter<'a, BoardValue>;
+
+    #[inline]
+    fn into_iter(self) -> Self::IntoIter {
+        self.iter()
+    }
+}
+
+#[derive(Debug, PartialEq, Eq, Hash, Clone, Deserialize, Serialize)]
+pub enum BoardKey {
+    Piece(PieceKind),
+    PieceWithPosition(PieceWithPosition),
+    Square(Square),
+    BoardValue(BoardValue),
+}
+
+impl From<Piece> for BoardKey {
+    #[inline]
+    fn from(value: Piece) -> Self {
+        Self::Piece(value.into())
+    }
+}
+
+impl From<&Piece> for BoardKey {
+    #[inline]
+    fn from(value: &Piece) -> Self {
+        Self::Piece(value.into())
+    }
+}
+
+impl From<PieceWithColor> for BoardKey {
+    #[inline]
+    fn from(value: PieceWithColor) -> Self {
+        Self::Piece(value.into())
+    }
+}
+
+impl From<&PieceWithColor> for BoardKey {
+    #[inline]
+    fn from(value: &PieceWithColor) -> Self {
+        Self::Piece(value.into())
+    }
+}
+
+impl From<PieceKind> for BoardKey {
+    #[inline]
+    fn from(value: PieceKind) -> Self {
+        Self::Piece(value)
+    }
+}
+
+impl From<&PieceKind> for BoardKey {
+    #[inline]
+    fn from(value: &PieceKind) -> Self {
+        Self::Piece(*value)
+    }
+}
+
+impl From<PieceWithPosition> for BoardKey {
+    fn from(value: PieceWithPosition) -> Self {
+        Self::PieceWithPosition(value)
+    }
+}
+impl From<Square> for BoardKey {
+    fn from(value: Square) -> Self {
+        Self::Square(value)
+    }
+}
+
+impl From<&Square> for BoardKey {
+    fn from(value: &Square) -> Self {
+        Self::Square(*value)
+    }
+}
+
+impl From<BoardValue> for BoardKey {
+    #[inline]
+    fn from(value: BoardValue) -> Self {
+        Self::BoardValue(value)
+    }
+}
+
+impl From<&BoardValue> for BoardKey {
+    #[inline]
+    fn from(value: &BoardValue) -> Self {
+        Self::BoardValue(value.clone())
+    }
+}
+
+#[derive(Debug, PartialEq, Eq, Hash, Clone, Copy, Deserialize, Serialize)]
+pub enum PiecePosition {
+    Field,
+    Stand,
+    Outside,
+}
+
+impl From<BoardValue> for PiecePosition {
+    #[inline]
+    #[rustfmt::skip]
+    fn from(value: BoardValue) -> Self {
+        match value {
+            BoardValue::Field { piece: _, square: _ } => PiecePosition::Field,
+            BoardValue::Stand { piece: _, count: _ } => PiecePosition::Stand,
+            BoardValue::Outside { piece: _, count: _ } => PiecePosition::Outside,
+        }
+    }
+}
+
+impl From<&BoardValue> for PiecePosition {
+    #[inline]
+    #[rustfmt::skip]
+    fn from(value: &BoardValue) -> Self {
+        match value {
+            BoardValue::Field { piece: _, square: _ } => PiecePosition::Field,
+            BoardValue::Stand { piece: _, count: _ } => PiecePosition::Stand,
+            BoardValue::Outside { piece: _, count: _ } => PiecePosition::Outside,
+        }
+    }
+}
+
+#[derive(Debug, PartialEq, Eq, Hash, Clone, Copy, Deserialize, Serialize)]
+pub struct PieceWithPosition {
+    kind: PieceKind,
+    position: PiecePosition,
+}
+
+impl PieceWithPosition {
+    #[inline]
+    fn new(kind: impl Into<PieceKind>, position: PiecePosition) -> Self {
+        Self {
+            kind: kind.into(),
+            position,
+        }
+    }
+}
+
+#[derive(Debug, PartialEq, Eq, Hash, Clone, Deserialize, Serialize)]
 pub enum BoardValue {
     Field {
         piece: PieceWithColor,
@@ -34,18 +473,27 @@ pub enum BoardValue {
 
 impl BoardValue {
     #[inline]
-    pub fn new_field(piece: PieceWithColor, square: Square) -> Self {
-        Self::Field { piece, square }
+    pub fn new_field(piece: impl Into<PieceWithColor>, square: Square) -> Self {
+        Self::Field {
+            piece: piece.into(),
+            square,
+        }
     }
 
     #[inline]
-    pub fn new_stand(piece: PieceWithColor, count: PieceCount) -> Self {
-        Self::Stand { piece, count }
+    pub fn new_stand(piece: impl Into<PieceWithColor>, count: PieceCount) -> Self {
+        Self::Stand {
+            piece: piece.into(),
+            count,
+        }
     }
 
     #[inline]
-    pub fn new_outside(piece: Piece, count: PieceCount) -> Self {
-        Self::Outside { piece, count }
+    pub fn new_outside(piece: impl Into<Piece>, count: PieceCount) -> Self {
+        Self::Outside {
+            piece: piece.into(),
+            count,
+        }
     }
 
     #[inline]
@@ -56,6 +504,29 @@ impl BoardValue {
     #[inline]
     pub fn shallow_hash<H: std::hash::Hasher>(&self, state: &mut H) {
         ShallowBoardValue(self).hash(state);
+    }
+
+    #[inline]
+    pub fn eq_piece_kind(&self, value: impl Into<PieceKind>) -> bool {
+        let value = value.into();
+        match self {
+            BoardValue::Field { piece, square: _ } => value == piece.into(),
+            BoardValue::Stand { piece, count: _ } => value == piece.into(),
+            BoardValue::Outside { piece, count: _ } => value == piece.into(),
+        }
+    }
+
+    #[inline]
+    pub fn eq_piece_position(&self, value: PiecePosition) -> bool {
+        PiecePosition::from(self) == value
+    }
+
+    #[inline]
+    pub fn eq_square(&self, value: &Square) -> bool {
+        match self {
+            BoardValue::Field { piece: _, square } => value == square,
+            _ => false,
+        }
     }
 }
 
@@ -138,166 +609,13 @@ impl<'a> From<&'a BoardValue> for ShallowBoardValue<'a> {
 impl Deref for ShallowBoardValue<'_> {
     type Target = BoardValue;
 
+    #[inline]
     fn deref(&self) -> &Self::Target {
         self.0
     }
 }
 
-pub trait BoardImpl {
-    #[inline]
-    fn new_board() -> Board {
-        Board::with_capacity(40)
-    }
-
-    fn field(&self) -> HashMap<Square, PieceWithColor>;
-    fn stand(&self) -> HashMap<PieceWithColor, PieceCount>;
-    fn outside(&self) -> HashMap<Piece, PieceCount>;
-    fn update(&mut self, value: &BoardValue, update_value: BoardValue) -> bool;
-    fn piece_count(&self) -> PieceCount;
-    fn find_piece(&self, piece: impl Into<PieceKind>) -> HashSet<BoardValue>;
-    fn filter_field(&self) -> HashSet<BoardValue>;
-    fn filter_stand(&self) -> HashSet<BoardValue>;
-    fn filter_outside(&self) -> HashSet<BoardValue>;
-    fn shallow_contains(&self, value: &BoardValue) -> bool;
-    fn shallow_get(&self, value: &BoardValue) -> Option<&BoardValue>;
-    fn shallow_take(&mut self, value: &BoardValue) -> Option<BoardValue>;
-    fn shallow_insert(&mut self, value: BoardValue) -> bool;
-    fn shallow_update(&mut self, value: &BoardValue, update_value: BoardValue) -> bool;
-}
-
-impl BoardImpl for Board {
-    fn field(&self) -> HashMap<Square, PieceWithColor> {
-        self.iter()
-            .filter_map(|x| match x {
-                BoardValue::Field { square, piece } => Some((*square, *piece)),
-                _ => None,
-            })
-            .collect()
-    }
-
-    fn stand(&self) -> HashMap<PieceWithColor, PieceCount> {
-        self.iter()
-            .filter_map(|x| match x {
-                BoardValue::Stand { piece, count } => Some((*piece, *count)),
-                _ => None,
-            })
-            .collect()
-    }
-
-    fn outside(&self) -> HashMap<Piece, PieceCount> {
-        self.iter()
-            .filter_map(|x| match x {
-                BoardValue::Outside { piece, count } => Some((*piece, *count)),
-                _ => None,
-            })
-            .collect()
-    }
-
-    fn update(&mut self, value: &BoardValue, update_value: BoardValue) -> bool {
-        if self.contains(value) {
-            self.remove(value) && self.insert(update_value)
-        } else {
-            false
-        }
-    }
-
-    fn piece_count(&self) -> PieceCount {
-        self.iter()
-            .map(|x| match x {
-                BoardValue::Field {
-                    piece: _,
-                    square: _,
-                } => 1,
-                BoardValue::Stand { piece: _, count } => *count,
-                BoardValue::Outside { piece: _, count } => *count,
-            })
-            .sum()
-    }
-
-    fn find_piece(&self, piece: impl Into<PieceKind>) -> HashSet<BoardValue> {
-        let target_piece: PieceKind = piece.into();
-        let target_piece = target_piece.piece();
-
-        self.iter()
-            .filter(|x| match x {
-                BoardValue::Field { piece, square: _ } => piece.piece() == target_piece,
-                BoardValue::Stand { piece, count: _ } => piece.piece() == target_piece,
-                BoardValue::Outside { piece, count: _ } => piece == target_piece,
-            })
-            .cloned()
-            .collect()
-    }
-
-    fn filter_field(&self) -> HashSet<BoardValue> {
-        self.iter()
-            .filter(|x| matches!(x, BoardValue::Field { .. }))
-            .cloned()
-            .collect()
-    }
-
-    fn filter_stand(&self) -> HashSet<BoardValue> {
-        self.iter()
-            .filter(|x| matches!(x, BoardValue::Stand { .. }))
-            .cloned()
-            .collect()
-    }
-
-    fn filter_outside(&self) -> HashSet<BoardValue> {
-        self.iter()
-            .filter(|x| matches!(x, BoardValue::Outside { .. }))
-            .cloned()
-            .collect()
-    }
-
-    fn shallow_contains(&self, value: &BoardValue) -> bool {
-        let value = ShallowBoardValue(value);
-        self.iter().any(|x| value == ShallowBoardValue(x))
-    }
-
-    fn shallow_get(&self, value: &BoardValue) -> Option<&BoardValue> {
-        let value = ShallowBoardValue(value);
-        self.iter().find(move |x| value == ShallowBoardValue(x))
-    }
-
-    fn shallow_take(&mut self, value: &BoardValue) -> Option<BoardValue> {
-        self.replace(value)
-        let value = self.shallow_get(value);
-
-        if let Some(value) = value {
-            self.take(value)
-        } else {
-            None
-        }
-        // let value = {
-        //     let shallow = ShallowBoardValue(&value);
-        //     self.iter().find(move |x| shallow == ShallowBoardValue(x))
-        // };
-        // if let Some(value) = value {
-        //     self.take(value)
-        // } else {
-        //     None
-        // }
-        // value.and_then(move |x| self.take(&x.clone()))
-    }
-
-    fn shallow_insert(&mut self, value: BoardValue) -> bool {
-        if let Some(target) = self.shallow_take(&value) {
-            self.remove(&target) && self.insert(value)
-        } else {
-            false
-        }
-    }
-
-    fn shallow_update(&mut self, value: &BoardValue, update_value: BoardValue) -> bool {
-        if let Some(value) = self.shallow_take(&value) {
-            self.remove(&value) && self.insert(update_value)
-        } else {
-            false
-        }
-    }
-}
-
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Deserialize, Serialize)]
 pub enum Handicap {
     Rook,
     Bishop,
@@ -309,7 +627,7 @@ pub enum Handicap {
     SixPiece,
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
 pub enum BoardType {
     Even,
     Blank,
@@ -430,18 +748,19 @@ impl BoardType {
                 Square::new_unchecked(x, y),
             );
 
-            if !board.remove(&field) {
+            if !board.remove(field) {
                 unreachable!();
             }
 
             if let Some(BoardValue::Outside { piece, count }) =
-                board.shallow_take(&BoardValue::Outside { piece, count: 0 })
+                board.take(PieceWithPosition::new(piece, PiecePosition::Outside))
             {
                 let outside = BoardValue::new_outside(piece, count + 1);
-                board.remove(&outside);
-                board.insert(outside);
-            } else {
-                board.insert(BoardValue::new_outside(piece, 1));
+                if !board.insert(outside) {
+                    unreachable!()
+                }
+            } else if !board.insert(BoardValue::new_outside(piece, 1)) {
+                unreachable!()
             }
         }
 
@@ -514,10 +833,759 @@ impl BoardType {
 
 #[cfg(test)]
 mod tests {
-
+    use super::*;
     use std::{collections::hash_map::DefaultHasher, hash::Hasher};
 
-    use super::*;
+    fn make_test_board() -> Board {
+        let mut board = Board::new();
+        assert!(board.insert(BoardValue::new_field(
+            PieceWithColor::new_white(UnpromotedPiece::Pawn),
+            Square::new_unchecked(9, 3)
+        )));
+
+        assert!(board.insert(BoardValue::new_field(
+            PieceWithColor::new_black(UnpromotedPiece::Pawn),
+            Square::new_unchecked(9, 7)
+        )));
+
+        assert!(board.insert(BoardValue::new_stand(
+            PieceWithColor::new_white(UnpromotedPiece::Pawn),
+            2
+        )));
+
+        assert!(board.insert(BoardValue::new_stand(
+            PieceWithColor::new_black(UnpromotedPiece::Rook),
+            2
+        )));
+
+        assert!(board.insert(BoardValue::new_outside(UnpromotedPiece::Pawn, 3)));
+        assert!(board.insert(BoardValue::new_outside(UnpromotedPiece::King, 1)));
+
+        board
+    }
+
+    #[test]
+    fn board_capacity() {
+        assert!(Board::new().capacity() >= 40);
+        assert!(Board::with_capacity(30).capacity() >= 30);
+    }
+
+    #[test]
+    fn board_field() {
+        assert_eq!(Board::new().field(), HashMap::new());
+
+        let board = make_test_board();
+        let field = board.field();
+        assert_eq!(field.len(), 2);
+        assert_eq!(
+            field.get(&Square::new_unchecked(9, 3)),
+            Some(&PieceWithColor::new_white(UnpromotedPiece::Pawn))
+        );
+        assert_eq!(
+            field.get(&Square::new_unchecked(9, 7)),
+            Some(&PieceWithColor::new_black(UnpromotedPiece::Pawn))
+        );
+    }
+
+    #[test]
+    pub fn board_stand() {
+        assert_eq!(Board::new().stand(), HashMap::new());
+
+        let board = make_test_board();
+        let stand = board.stand();
+        assert_eq!(stand.len(), 2);
+        assert_eq!(
+            stand.get(&PieceWithColor::new_black(UnpromotedPiece::Rook)),
+            Some(&2)
+        );
+
+        assert_eq!(
+            stand.get(&PieceWithColor::new_white(UnpromotedPiece::Pawn)),
+            Some(&2)
+        );
+    }
+
+    #[test]
+    pub fn board_outside() {
+        assert_eq!(Board::new().outside(), HashMap::new());
+
+        let board = make_test_board();
+        let outside = board.outside();
+        assert_eq!(outside.len(), 2);
+        assert_eq!(outside.get(&UnpromotedPiece::Pawn.into()), Some(&3));
+        assert_eq!(outside.get(&UnpromotedPiece::King.into()), Some(&1));
+    }
+
+    #[test]
+    fn board_piece_count() {
+        assert_eq!(Board::new().piece_count(), 0);
+
+        let board = make_test_board();
+        assert_eq!(board.piece_count(), 10);
+    }
+
+    #[test]
+    fn board_find_piece() {
+        let board = make_test_board();
+        let values = board.find_piece(UnpromotedPiece::Pawn);
+        assert_eq!(values.len(), 4);
+
+        assert!(values.contains(&BoardValue::new_field(
+            PieceWithColor::new_white(UnpromotedPiece::Pawn),
+            Square::new_unchecked(9, 3),
+        )));
+
+        assert!(values.contains(&BoardValue::new_field(
+            PieceWithColor::new_black(UnpromotedPiece::Pawn),
+            Square::new_unchecked(9, 7),
+        )));
+
+        assert!(values.contains(&BoardValue::new_stand(
+            PieceWithColor::new_white(UnpromotedPiece::Pawn),
+            2
+        )));
+
+        assert!(values.contains(&BoardValue::new_outside(UnpromotedPiece::Pawn, 3)));
+
+        let values = board.find_piece(PromotedPiece::Pawn);
+        assert_eq!(values.len(), 0);
+    }
+
+    #[test]
+    fn board_filter_() {
+        let board = make_test_board();
+
+        let field = board.filter_field();
+        assert_eq!(field.len(), 2);
+        assert!(field.contains(&BoardValue::new_field(
+            PieceWithColor::new_black(UnpromotedPiece::Pawn),
+            Square::new_unchecked(9, 7)
+        )));
+        assert!(field.contains(&BoardValue::new_field(
+            PieceWithColor::new_white(UnpromotedPiece::Pawn),
+            Square::new_unchecked(9, 3)
+        )));
+
+        let stand = board.filter_stand();
+        assert_eq!(stand.len(), 2);
+        assert!(stand.contains(&BoardValue::new_stand(
+            PieceWithColor::new_white(UnpromotedPiece::Pawn),
+            2
+        )));
+        assert!(stand.contains(&BoardValue::new_stand(
+            PieceWithColor::new_black(UnpromotedPiece::Rook),
+            2
+        )));
+
+        let outside = board.filter_outside();
+        assert_eq!(outside.len(), 2);
+
+        assert!(outside.contains(&BoardValue::new_outside(UnpromotedPiece::Pawn, 3)));
+        assert!(outside.contains(&BoardValue::new_outside(UnpromotedPiece::King, 1)));
+    }
+
+    #[test]
+    fn board_contains() {
+        let board = make_test_board();
+
+        // PieceKind
+        assert!(board.contains(PieceKind::new_black(UnpromotedPiece::Pawn)));
+        assert!(board.contains(PieceKind::new_black(UnpromotedPiece::Rook)));
+        assert!(!board.contains(PieceKind::new_black(UnpromotedPiece::King)));
+        assert!(!board.contains(PieceKind::new_black(PromotedPiece::Pawn)));
+        assert!(board.contains(PieceKind::new(UnpromotedPiece::Pawn)));
+        assert!(!board.contains(PieceKind::new(UnpromotedPiece::Rook)));
+
+        // PieceWithPosition
+        assert!(board.contains(PieceWithPosition::new(
+            PieceKind::new_black(UnpromotedPiece::Pawn),
+            PiecePosition::Field
+        )));
+
+        assert!(!board.contains(PieceWithPosition::new(
+            PieceKind::new(UnpromotedPiece::Pawn),
+            PiecePosition::Field
+        )));
+
+        assert!(!board.contains(PieceWithPosition::new(
+            PieceKind::new_black(UnpromotedPiece::Rook),
+            PiecePosition::Field
+        )));
+
+        assert!(!board.contains(PieceWithPosition::new(
+            PieceKind::new(UnpromotedPiece::King),
+            PiecePosition::Field
+        )));
+
+        assert!(board.contains(PieceWithPosition::new(
+            PieceKind::new_white(UnpromotedPiece::Pawn),
+            PiecePosition::Stand
+        )));
+
+        assert!(!board.contains(PieceWithPosition::new(
+            PieceKind::new_black(UnpromotedPiece::Pawn),
+            PiecePosition::Stand
+        )));
+
+        assert!(!board.contains(PieceWithPosition::new(
+            PieceKind::new(UnpromotedPiece::Pawn),
+            PiecePosition::Stand
+        )));
+
+        assert!(!board.contains(PieceWithPosition::new(
+            PieceKind::new(UnpromotedPiece::King),
+            PiecePosition::Stand
+        )));
+
+        assert!(board.contains(PieceWithPosition::new(
+            PieceKind::new(UnpromotedPiece::Pawn),
+            PiecePosition::Outside
+        )));
+
+        assert!(board.contains(PieceWithPosition::new(
+            PieceKind::new(UnpromotedPiece::King),
+            PiecePosition::Outside
+        )));
+
+        assert!(!board.contains(PieceWithPosition::new(
+            PieceKind::new_black(UnpromotedPiece::Pawn),
+            PiecePosition::Outside
+        )));
+
+        assert!(!board.contains(PieceWithPosition::new(
+            PieceKind::new_black(UnpromotedPiece::King),
+            PiecePosition::Outside
+        )));
+
+        // Square
+        assert!(board.contains(Square::new_unchecked(9, 7)));
+        assert!(board.contains(Square::new_unchecked(9, 3)));
+        assert!(!board.contains(Square::new_unchecked(7, 9)));
+        assert!(!board.contains(Square::new_unchecked(1, 1)));
+
+        // BoardValue
+        assert!(board.contains(BoardValue::new_field(
+            PieceWithColor::new_white(UnpromotedPiece::Pawn),
+            Square::new_unchecked(9, 3)
+        )));
+
+        assert!(!board.contains(BoardValue::new_field(
+            PieceWithColor::new_white(UnpromotedPiece::Pawn),
+            Square::new_unchecked(9, 9)
+        )));
+    }
+
+    #[test]
+    fn board_get() {
+        let board = make_test_board();
+        // PieceKind
+        assert_eq!(
+            board.get(PieceKind::new_black(UnpromotedPiece::Bishop)),
+            None
+        );
+
+        assert_eq!(board.get(PieceKind::new_black(UnpromotedPiece::King)), None);
+
+        // PieceWithPosition
+        assert_eq!(
+            board.get(PieceWithPosition::new(
+                PieceKind::new_black(UnpromotedPiece::Pawn),
+                PiecePosition::Field
+            )),
+            Some(&BoardValue::new_field(
+                PieceWithColor::new_black(UnpromotedPiece::Pawn),
+                Square::new_unchecked(9, 7)
+            ))
+        );
+
+        assert_eq!(
+            board.get(PieceWithPosition::new(
+                PieceKind::new_white(UnpromotedPiece::Pawn),
+                PiecePosition::Field
+            )),
+            Some(&BoardValue::new_field(
+                PieceWithColor::new_white(UnpromotedPiece::Pawn),
+                Square::new_unchecked(9, 3)
+            ))
+        );
+
+        assert_eq!(
+            board.get(PieceWithPosition::new(
+                PieceKind::new(UnpromotedPiece::Pawn),
+                PiecePosition::Field
+            )),
+            None
+        );
+
+        assert_eq!(
+            board.get(PieceWithPosition::new(
+                PieceKind::new_black(UnpromotedPiece::Rook),
+                PiecePosition::Field
+            )),
+            None
+        );
+
+        assert_eq!(
+            board.get(PieceWithPosition::new(
+                PieceKind::new(UnpromotedPiece::King),
+                PiecePosition::Field
+            )),
+            None
+        );
+
+        assert_eq!(
+            board.get(PieceWithPosition::new(
+                PieceKind::new_white(UnpromotedPiece::Pawn),
+                PiecePosition::Stand
+            )),
+            Some(&BoardValue::new_stand(
+                PieceWithColor::new_white(UnpromotedPiece::Pawn),
+                2
+            ))
+        );
+
+        assert_eq!(
+            board.get(PieceWithPosition::new(
+                PieceKind::new_black(UnpromotedPiece::Pawn),
+                PiecePosition::Stand
+            )),
+            None
+        );
+
+        assert_eq!(
+            board.get(PieceWithPosition::new(
+                PieceKind::new(UnpromotedPiece::Pawn),
+                PiecePosition::Stand
+            )),
+            None
+        );
+
+        assert_eq!(
+            board.get(PieceWithPosition::new(
+                PieceKind::new(UnpromotedPiece::King),
+                PiecePosition::Stand
+            )),
+            None
+        );
+
+        assert_eq!(
+            board.get(PieceWithPosition::new(
+                PieceKind::new(UnpromotedPiece::Pawn),
+                PiecePosition::Outside
+            )),
+            Some(&BoardValue::new_outside(UnpromotedPiece::Pawn, 3))
+        );
+
+        assert_eq!(
+            board.get(PieceWithPosition::new(
+                PieceKind::new(UnpromotedPiece::King),
+                PiecePosition::Outside
+            )),
+            Some(&BoardValue::new_outside(UnpromotedPiece::King, 1))
+        );
+
+        assert_eq!(
+            board.get(PieceWithPosition::new(
+                PieceKind::new_black(UnpromotedPiece::Pawn),
+                PiecePosition::Outside
+            )),
+            None
+        );
+
+        assert_eq!(
+            board.get(PieceWithPosition::new(
+                PieceKind::new_black(UnpromotedPiece::King),
+                PiecePosition::Outside
+            )),
+            None
+        );
+
+        // Square
+        assert_eq!(
+            board.get(Square::new_unchecked(9, 7)),
+            Some(&BoardValue::new_field(
+                PieceWithColor::new_black(UnpromotedPiece::Pawn),
+                Square::new_unchecked(9, 7)
+            ))
+        );
+        assert_eq!(
+            board.get(Square::new_unchecked(9, 3)),
+            Some(&BoardValue::new_field(
+                PieceWithColor::new_white(UnpromotedPiece::Pawn),
+                Square::new_unchecked(9, 3)
+            ))
+        );
+        assert_eq!(board.get(Square::new_unchecked(7, 9)), None);
+        assert_eq!(board.get(Square::new_unchecked(1, 1)), None);
+
+        // BoardValue
+        assert_eq!(
+            board.get(BoardValue::new_field(
+                PieceWithColor::new_white(UnpromotedPiece::Pawn),
+                Square::new_unchecked(9, 3)
+            )),
+            Some(&BoardValue::new_field(
+                PieceWithColor::new_white(UnpromotedPiece::Pawn),
+                Square::new_unchecked(9, 3)
+            ))
+        );
+
+        assert_eq!(
+            board.get(BoardValue::new_field(
+                PieceWithColor::new_white(UnpromotedPiece::Pawn),
+                Square::new_unchecked(9, 9)
+            )),
+            None
+        );
+    }
+
+    #[test]
+    fn board_remove() {
+        let mut board = make_test_board();
+        // PieceKind
+        // assert!(board.remove(PieceKind::new_black(UnpromotedPiece::Pawn)));
+        assert!(board.remove(PieceKind::new_black(UnpromotedPiece::Rook)));
+        assert!(!board.remove(PieceKind::new_black(UnpromotedPiece::Rook)));
+
+        assert!(!board.remove(PieceKind::new_black(UnpromotedPiece::King)));
+        assert!(!board.remove(PieceKind::new_black(PromotedPiece::Pawn)));
+        assert!(board.remove(PieceKind::new(UnpromotedPiece::Pawn)));
+        assert!(!board.remove(PieceKind::new(UnpromotedPiece::Pawn)));
+
+        assert!(!board.remove(PieceKind::new(UnpromotedPiece::Rook)));
+
+        // PieceWithPosition
+        let mut board = make_test_board();
+        assert!(board.remove(PieceWithPosition::new(
+            PieceKind::new_black(UnpromotedPiece::Pawn),
+            PiecePosition::Field
+        )));
+
+        assert!(!board.remove(PieceWithPosition::new(
+            PieceKind::new_black(UnpromotedPiece::Pawn),
+            PiecePosition::Field
+        )));
+
+        assert!(!board.remove(PieceWithPosition::new(
+            PieceKind::new(UnpromotedPiece::Pawn),
+            PiecePosition::Field
+        )));
+
+        assert!(!board.remove(PieceWithPosition::new(
+            PieceKind::new_black(UnpromotedPiece::Rook),
+            PiecePosition::Field
+        )));
+
+        assert!(!board.remove(PieceWithPosition::new(
+            PieceKind::new(UnpromotedPiece::King),
+            PiecePosition::Field
+        )));
+
+        assert!(board.remove(PieceWithPosition::new(
+            PieceKind::new_white(UnpromotedPiece::Pawn),
+            PiecePosition::Stand
+        )));
+
+        assert!(!board.remove(PieceWithPosition::new(
+            PieceKind::new_white(UnpromotedPiece::Pawn),
+            PiecePosition::Stand
+        )));
+
+        assert!(!board.remove(PieceWithPosition::new(
+            PieceKind::new_black(UnpromotedPiece::Pawn),
+            PiecePosition::Stand
+        )));
+
+        assert!(!board.remove(PieceWithPosition::new(
+            PieceKind::new(UnpromotedPiece::Pawn),
+            PiecePosition::Stand
+        )));
+
+        assert!(!board.remove(PieceWithPosition::new(
+            PieceKind::new(UnpromotedPiece::King),
+            PiecePosition::Stand
+        )));
+
+        assert!(board.remove(PieceWithPosition::new(
+            PieceKind::new(UnpromotedPiece::Pawn),
+            PiecePosition::Outside
+        )));
+
+        assert!(!board.remove(PieceWithPosition::new(
+            PieceKind::new(UnpromotedPiece::Pawn),
+            PiecePosition::Outside
+        )));
+
+        assert!(board.remove(PieceWithPosition::new(
+            PieceKind::new(UnpromotedPiece::King),
+            PiecePosition::Outside
+        )));
+
+        assert!(!board.remove(PieceWithPosition::new(
+            PieceKind::new(UnpromotedPiece::King),
+            PiecePosition::Outside
+        )));
+
+        assert!(!board.remove(PieceWithPosition::new(
+            PieceKind::new_black(UnpromotedPiece::Pawn),
+            PiecePosition::Outside
+        )));
+
+        assert!(!board.remove(PieceWithPosition::new(
+            PieceKind::new_black(UnpromotedPiece::King),
+            PiecePosition::Outside
+        )));
+
+        // Square
+        let mut board = make_test_board();
+        assert!(board.remove(Square::new_unchecked(9, 7)));
+        assert!(!board.remove(Square::new_unchecked(9, 7)));
+
+        assert!(board.remove(Square::new_unchecked(9, 3)));
+        assert!(!board.remove(Square::new_unchecked(9, 3)));
+
+        assert!(!board.remove(Square::new_unchecked(7, 9)));
+        assert!(!board.remove(Square::new_unchecked(1, 1)));
+
+        // BoardValue
+        let mut board = make_test_board();
+        assert!(board.remove(BoardValue::new_field(
+            PieceWithColor::new_white(UnpromotedPiece::Pawn),
+            Square::new_unchecked(9, 3)
+        )));
+
+        assert!(!board.remove(BoardValue::new_field(
+            PieceWithColor::new_white(UnpromotedPiece::Pawn),
+            Square::new_unchecked(9, 3)
+        )));
+
+        assert!(!board.remove(BoardValue::new_field(
+            PieceWithColor::new_white(UnpromotedPiece::Pawn),
+            Square::new_unchecked(9, 9)
+        )));
+    }
+
+    #[test]
+    fn board_take() {
+        let mut board = make_test_board();
+        // PieceKind
+        // assert_eq!(board.take(PieceKind::new_black(UnpromotedPiece::Pawn)));
+        assert_eq!(
+            board.take(PieceKind::new_black(UnpromotedPiece::Rook)),
+            Some(BoardValue::new_stand(
+                PieceWithColor::new_black(UnpromotedPiece::Rook),
+                2
+            ))
+        );
+        assert_eq!(
+            board.take(PieceKind::new_black(UnpromotedPiece::Rook)),
+            None
+        );
+
+        assert_eq!(
+            board.take(PieceKind::new_black(UnpromotedPiece::King)),
+            None
+        );
+        assert_eq!(board.take(PieceKind::new_black(PromotedPiece::Pawn)), None);
+        assert_eq!(
+            board.take(PieceKind::new(UnpromotedPiece::Pawn)),
+            Some(BoardValue::new_outside(UnpromotedPiece::Pawn, 3))
+        );
+        assert_eq!(board.take(PieceKind::new(UnpromotedPiece::Pawn)), None);
+
+        assert_eq!(board.take(PieceKind::new(UnpromotedPiece::Rook)), None);
+
+        // PieceWithPosition
+        let mut board = make_test_board();
+        assert_eq!(
+            board.take(PieceWithPosition::new(
+                PieceKind::new_black(UnpromotedPiece::Pawn),
+                PiecePosition::Field
+            )),
+            Some(BoardValue::new_field(
+                PieceWithColor::new_black(UnpromotedPiece::Pawn),
+                Square::new_unchecked(9, 7)
+            ))
+        );
+
+        assert_eq!(
+            board.take(PieceWithPosition::new(
+                PieceKind::new_white(UnpromotedPiece::Pawn),
+                PiecePosition::Field
+            )),
+            Some(BoardValue::new_field(
+                PieceWithColor::new_white(UnpromotedPiece::Pawn),
+                Square::new_unchecked(9, 3)
+            ))
+        );
+
+        assert_eq!(
+            board.take(PieceWithPosition::new(
+                PieceKind::new(UnpromotedPiece::Pawn),
+                PiecePosition::Field
+            )),
+            None
+        );
+
+        assert_eq!(
+            board.take(PieceWithPosition::new(
+                PieceKind::new_black(UnpromotedPiece::Rook),
+                PiecePosition::Field
+            )),
+            None
+        );
+
+        assert_eq!(
+            board.take(PieceWithPosition::new(
+                PieceKind::new(UnpromotedPiece::King),
+                PiecePosition::Field
+            )),
+            None
+        );
+
+        assert_eq!(
+            board.take(PieceWithPosition::new(
+                PieceKind::new_white(UnpromotedPiece::Pawn),
+                PiecePosition::Stand
+            )),
+            Some(BoardValue::new_stand(
+                PieceWithColor::new_white(UnpromotedPiece::Pawn),
+                2
+            ))
+        );
+
+        assert_eq!(
+            board.take(PieceWithPosition::new(
+                PieceKind::new_white(UnpromotedPiece::Pawn),
+                PiecePosition::Stand
+            )),
+            None
+        );
+
+        assert_eq!(
+            board.take(PieceWithPosition::new(
+                PieceKind::new_black(UnpromotedPiece::Pawn),
+                PiecePosition::Stand
+            )),
+            None
+        );
+
+        assert_eq!(
+            board.take(PieceWithPosition::new(
+                PieceKind::new(UnpromotedPiece::Pawn),
+                PiecePosition::Stand
+            )),
+            None
+        );
+
+        assert_eq!(
+            board.take(PieceWithPosition::new(
+                PieceKind::new(UnpromotedPiece::King),
+                PiecePosition::Stand
+            )),
+            None
+        );
+
+        assert_eq!(
+            board.take(PieceWithPosition::new(
+                PieceKind::new(UnpromotedPiece::Pawn),
+                PiecePosition::Outside
+            )),
+            Some(BoardValue::new_outside(UnpromotedPiece::Pawn, 3))
+        );
+
+        assert_eq!(
+            board.take(PieceWithPosition::new(
+                PieceKind::new(UnpromotedPiece::Pawn),
+                PiecePosition::Outside
+            )),
+            None
+        );
+
+        assert_eq!(
+            board.take(PieceWithPosition::new(
+                PieceKind::new(UnpromotedPiece::King),
+                PiecePosition::Outside
+            )),
+            Some(BoardValue::new_outside(UnpromotedPiece::King, 1))
+        );
+
+        assert_eq!(
+            board.take(PieceWithPosition::new(
+                PieceKind::new(UnpromotedPiece::King),
+                PiecePosition::Outside
+            )),
+            None
+        );
+
+        assert_eq!(
+            board.take(PieceWithPosition::new(
+                PieceKind::new_black(UnpromotedPiece::Pawn),
+                PiecePosition::Outside
+            )),
+            None
+        );
+
+        assert_eq!(
+            board.take(PieceWithPosition::new(
+                PieceKind::new_black(UnpromotedPiece::King),
+                PiecePosition::Outside
+            )),
+            None
+        );
+
+        // Square
+        let mut board = make_test_board();
+        assert_eq!(
+            board.take(Square::new_unchecked(9, 7)),
+            Some(BoardValue::new_field(
+                PieceWithColor::new_black(UnpromotedPiece::Pawn),
+                Square::new_unchecked(9, 7)
+            ))
+        );
+        assert_eq!(board.take(Square::new_unchecked(9, 7)), None);
+
+        assert_eq!(
+            board.take(Square::new_unchecked(9, 3)),
+            Some(BoardValue::new_field(
+                PieceWithColor::new_white(UnpromotedPiece::Pawn),
+                Square::new_unchecked(9, 3)
+            ))
+        );
+        assert_eq!(board.take(Square::new_unchecked(9, 3)), None);
+
+        assert_eq!(board.take(Square::new_unchecked(7, 9)), None);
+        assert_eq!(board.take(Square::new_unchecked(1, 1)), None);
+
+        // BoardValue
+        let mut board = make_test_board();
+        assert_eq!(
+            board.take(BoardValue::new_field(
+                PieceWithColor::new_white(UnpromotedPiece::Pawn),
+                Square::new_unchecked(9, 3)
+            )),
+            Some(BoardValue::new_field(
+                PieceWithColor::new_white(UnpromotedPiece::Pawn),
+                Square::new_unchecked(9, 3)
+            ))
+        );
+
+        assert_eq!(
+            board.take(BoardValue::new_field(
+                PieceWithColor::new_white(UnpromotedPiece::Pawn),
+                Square::new_unchecked(9, 3)
+            )),
+            None
+        );
+
+        assert_eq!(
+            board.take(BoardValue::new_field(
+                PieceWithColor::new_white(UnpromotedPiece::Pawn),
+                Square::new_unchecked(9, 9)
+            )),
+            None
+        );
+    }
 
     #[test]
     fn board_value_new_field() {
@@ -547,7 +1615,7 @@ mod tests {
     #[test]
     fn board_value_new_outside() {
         assert_eq!(
-            BoardValue::new_outside(UnpromotedPiece::Lance.into(), 2),
+            BoardValue::new_outside(UnpromotedPiece::Lance, 2),
             BoardValue::Outside {
                 piece: UnpromotedPiece::Lance.into(),
                 count: 2,
@@ -593,8 +1661,7 @@ mod tests {
         let hasher_stand =
             BoardValue::new_stand(PieceWithColor::new_black(UnpromotedPiece::Pawn), 1)
                 .get_shallow_hash();
-        let hasher_outside =
-            BoardValue::new_outside(UnpromotedPiece::Pawn.into(), 1).get_shallow_hash();
+        let hasher_outside = BoardValue::new_outside(UnpromotedPiece::Pawn, 1).get_shallow_hash();
 
         assert_eq!(hasher1, hasher2);
         assert_ne!(hasher1, hasher3);
@@ -638,8 +1705,7 @@ mod tests {
         )
         .get_shallow_hash();
 
-        let hasher_outside =
-            BoardValue::new_outside(UnpromotedPiece::Pawn.into(), 1).get_shallow_hash();
+        let hasher_outside = BoardValue::new_outside(UnpromotedPiece::Pawn, 1).get_shallow_hash();
 
         assert_eq!(hasher1, hasher2);
         assert_ne!(hasher1, hasher3);
@@ -666,10 +1732,10 @@ mod tests {
 
     #[test]
     fn board_value_hash_outside() {
-        let hasher1 = BoardValue::new_outside(UnpromotedPiece::Pawn.into(), 1).get_shallow_hash();
-        let hasher2 = BoardValue::new_outside(UnpromotedPiece::Pawn.into(), 8).get_shallow_hash();
-        let hasher3 = BoardValue::new_outside(PromotedPiece::Pawn.into(), 1).get_shallow_hash();
-        let hasher4 = BoardValue::new_outside(UnpromotedPiece::Rook.into(), 1).get_shallow_hash();
+        let hasher1 = BoardValue::new_outside(UnpromotedPiece::Pawn, 1).get_shallow_hash();
+        let hasher2 = BoardValue::new_outside(UnpromotedPiece::Pawn, 8).get_shallow_hash();
+        let hasher3 = BoardValue::new_outside(PromotedPiece::Pawn, 1).get_shallow_hash();
+        let hasher4 = BoardValue::new_outside(UnpromotedPiece::Rook, 1).get_shallow_hash();
 
         let hasher_field = BoardValue::new_field(
             PieceWithColor::new_black(UnpromotedPiece::Pawn),
@@ -721,7 +1787,7 @@ mod tests {
         );
         let value_stand =
             BoardValue::new_stand(PieceWithColor::new_black(UnpromotedPiece::Pawn), 1);
-        let value_outside = BoardValue::new_outside(UnpromotedPiece::Pawn.into(), 1);
+        let value_outside = BoardValue::new_outside(UnpromotedPiece::Pawn, 1);
 
         assert_eq!(ShallowBoardValue(&value1), ShallowBoardValue(&value2));
         assert_ne!(ShallowBoardValue(&value1), ShallowBoardValue(&value3));
@@ -753,7 +1819,7 @@ mod tests {
             PieceWithColor::new_black(UnpromotedPiece::Pawn),
             Square::new_unchecked(5, 5),
         );
-        let value_outside = BoardValue::new_outside(UnpromotedPiece::Pawn.into(), 1);
+        let value_outside = BoardValue::new_outside(UnpromotedPiece::Pawn, 1);
 
         assert_eq!(ShallowBoardValue(&value1), ShallowBoardValue(&value2));
         assert_ne!(ShallowBoardValue(&value1), ShallowBoardValue(&value3));
@@ -781,10 +1847,10 @@ mod tests {
     #[test]
     #[rustfmt::skip]
     fn shallow_board_value_eq_outside() {
-        let value1 = BoardValue::new_outside(UnpromotedPiece::Pawn.into(), 1);
-        let value2 = BoardValue::new_outside(UnpromotedPiece::Pawn.into(), 8);
-        let value3 = BoardValue::new_outside(PromotedPiece::Pawn.into(), 1);
-        let value4 = BoardValue::new_outside(UnpromotedPiece::Rook.into(), 1);
+        let value1 = BoardValue::new_outside(UnpromotedPiece::Pawn, 1);
+        let value2 = BoardValue::new_outside(UnpromotedPiece::Pawn, 8);
+        let value3 = BoardValue::new_outside(PromotedPiece::Pawn, 1);
+        let value4 = BoardValue::new_outside(UnpromotedPiece::Rook, 1);
 
         let value_field = BoardValue::new_field(
             PieceWithColor::new_black(UnpromotedPiece::Pawn),
@@ -888,14 +1954,14 @@ mod tests {
         assert_eq!(board.piece_count(), 40);
 
         let cases = [
-            BoardValue::new_outside(UnpromotedPiece::Pawn.into(), 18),
-            BoardValue::new_outside(UnpromotedPiece::Lance.into(), 4),
-            BoardValue::new_outside(UnpromotedPiece::Knight.into(), 4),
-            BoardValue::new_outside(UnpromotedPiece::Silver.into(), 4),
-            BoardValue::new_outside(UnpromotedPiece::Gold.into(), 4),
-            BoardValue::new_outside(UnpromotedPiece::Bishop.into(), 2),
-            BoardValue::new_outside(UnpromotedPiece::Rook.into(), 2),
-            BoardValue::new_outside(UnpromotedPiece::King.into(), 2),
+            BoardValue::new_outside(UnpromotedPiece::Pawn, 18),
+            BoardValue::new_outside(UnpromotedPiece::Lance, 4),
+            BoardValue::new_outside(UnpromotedPiece::Knight, 4),
+            BoardValue::new_outside(UnpromotedPiece::Silver, 4),
+            BoardValue::new_outside(UnpromotedPiece::Gold, 4),
+            BoardValue::new_outside(UnpromotedPiece::Bishop, 2),
+            BoardValue::new_outside(UnpromotedPiece::Rook, 2),
+            BoardValue::new_outside(UnpromotedPiece::King, 2),
         ];
 
         for case in cases.iter() {
@@ -953,7 +2019,7 @@ mod tests {
             make_field(Black, 3, 7, UnpromotedPiece::Pawn),
             make_field(Black, 2, 7, UnpromotedPiece::Pawn),
             make_field(Black, 1, 7, UnpromotedPiece::Pawn),
-            BoardValue::new_outside(UnpromotedPiece::Rook.into(), 1),
+            BoardValue::new_outside(UnpromotedPiece::Rook, 1),
         ];
 
         for case in cases.iter() {
@@ -1011,7 +2077,7 @@ mod tests {
             make_field(Black, 3, 7, UnpromotedPiece::Pawn),
             make_field(Black, 2, 7, UnpromotedPiece::Pawn),
             make_field(Black, 1, 7, UnpromotedPiece::Pawn),
-            BoardValue::new_outside(UnpromotedPiece::Bishop.into(), 1),
+            BoardValue::new_outside(UnpromotedPiece::Bishop, 1),
         ];
 
         for case in cases.iter() {
@@ -1069,7 +2135,7 @@ mod tests {
             make_field(Black, 3, 7, UnpromotedPiece::Pawn),
             make_field(Black, 2, 7, UnpromotedPiece::Pawn),
             make_field(Black, 1, 7, UnpromotedPiece::Pawn),
-            BoardValue::new_outside(UnpromotedPiece::Lance.into(), 1),
+            BoardValue::new_outside(UnpromotedPiece::Lance, 1),
         ];
 
         for case in cases.iter() {
@@ -1127,8 +2193,8 @@ mod tests {
             make_field(Black, 3, 7, UnpromotedPiece::Pawn),
             make_field(Black, 2, 7, UnpromotedPiece::Pawn),
             make_field(Black, 1, 7, UnpromotedPiece::Pawn),
-            BoardValue::new_outside(UnpromotedPiece::Lance.into(), 1),
-            BoardValue::new_outside(UnpromotedPiece::Rook.into(), 1),
+            BoardValue::new_outside(UnpromotedPiece::Lance, 1),
+            BoardValue::new_outside(UnpromotedPiece::Rook, 1),
         ];
 
         for case in cases.iter() {
@@ -1186,8 +2252,8 @@ mod tests {
             make_field(Black, 3, 7, UnpromotedPiece::Pawn),
             make_field(Black, 2, 7, UnpromotedPiece::Pawn),
             make_field(Black, 1, 7, UnpromotedPiece::Pawn),
-            BoardValue::new_outside(UnpromotedPiece::Lance.into(), 1),
-            BoardValue::new_outside(UnpromotedPiece::Bishop.into(), 1),
+            BoardValue::new_outside(UnpromotedPiece::Lance, 1),
+            BoardValue::new_outside(UnpromotedPiece::Bishop, 1),
         ];
 
         for case in cases.iter() {
@@ -1245,8 +2311,8 @@ mod tests {
             make_field(Black, 3, 7, UnpromotedPiece::Pawn),
             make_field(Black, 2, 7, UnpromotedPiece::Pawn),
             make_field(Black, 1, 7, UnpromotedPiece::Pawn),
-            BoardValue::new_outside(UnpromotedPiece::Rook.into(), 1),
-            BoardValue::new_outside(UnpromotedPiece::Bishop.into(), 1),
+            BoardValue::new_outside(UnpromotedPiece::Rook, 1),
+            BoardValue::new_outside(UnpromotedPiece::Bishop, 1),
         ];
 
         for case in cases.iter() {
@@ -1304,9 +2370,9 @@ mod tests {
             make_field(Black, 3, 7, UnpromotedPiece::Pawn),
             make_field(Black, 2, 7, UnpromotedPiece::Pawn),
             make_field(Black, 1, 7, UnpromotedPiece::Pawn),
-            BoardValue::new_outside(UnpromotedPiece::Rook.into(), 1),
-            BoardValue::new_outside(UnpromotedPiece::Bishop.into(), 1),
-            BoardValue::new_outside(UnpromotedPiece::Lance.into(), 2),
+            BoardValue::new_outside(UnpromotedPiece::Rook, 1),
+            BoardValue::new_outside(UnpromotedPiece::Bishop, 1),
+            BoardValue::new_outside(UnpromotedPiece::Lance, 2),
         ];
 
         for case in cases.iter() {
@@ -1364,10 +2430,10 @@ mod tests {
             make_field(Black, 3, 7, UnpromotedPiece::Pawn),
             make_field(Black, 2, 7, UnpromotedPiece::Pawn),
             make_field(Black, 1, 7, UnpromotedPiece::Pawn),
-            BoardValue::new_outside(UnpromotedPiece::Rook.into(), 1),
-            BoardValue::new_outside(UnpromotedPiece::Bishop.into(), 1),
-            BoardValue::new_outside(UnpromotedPiece::Lance.into(), 2),
-            BoardValue::new_outside(UnpromotedPiece::Knight.into(), 2),
+            BoardValue::new_outside(UnpromotedPiece::Rook, 1),
+            BoardValue::new_outside(UnpromotedPiece::Bishop, 1),
+            BoardValue::new_outside(UnpromotedPiece::Lance, 2),
+            BoardValue::new_outside(UnpromotedPiece::Knight, 2),
         ];
 
         for case in cases.iter() {
