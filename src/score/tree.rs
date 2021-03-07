@@ -2,10 +2,12 @@ use chrono::NaiveDateTime;
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, time::Duration};
 
-use super::branch::Branch;
+use super::{board::BoardType, branch::Branch};
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
 pub struct TreeMetadata {
+    initial_board: BoardType,
+
     start_time: Option<NaiveDateTime>,
     end_time: Option<NaiveDateTime>,
 
