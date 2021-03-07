@@ -34,6 +34,11 @@ impl Board {
     }
 
     #[inline]
+    pub fn capacity(&self) -> usize {
+        self.inner.capacity()
+    }
+
+    #[inline]
     pub fn field(&self) -> HashMap<Square, PieceWithColor> {
         self.iter()
             .filter_map(|x| match x {
@@ -857,10 +862,14 @@ impl BoardType {
 
 #[cfg(test)]
 mod tests {
-
+    use super::*;
     use std::{collections::hash_map::DefaultHasher, hash::Hasher};
 
-    use super::*;
+    #[test]
+    fn board_capacity() {
+        assert_eq!(Board::new().capacity(), 40);
+        assert_eq!(Board::with_capacity(30).capacity(), 30);
+    }
 
     #[test]
     fn board_value_new_field() {
