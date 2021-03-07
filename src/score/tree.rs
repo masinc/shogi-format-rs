@@ -20,6 +20,27 @@ pub struct TreeMetadata {
     extra_metadata: Option<HashMap<String, String>>,
 }
 
+impl TreeMetadata {
+    #[inline]
+    pub fn new() -> Self {
+        Self::default()
+    }
+}
+
+impl Default for TreeMetadata {
+    fn default() -> Self {
+        Self {
+            initial_board: BoardType::Even,
+            start_time: None,
+            end_time: None,
+            comment: None,
+            time_limit: None,
+            time_limit_every: None,
+            extra_metadata: None,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
 pub struct Tree {
     metadata: TreeMetadata,
