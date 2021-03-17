@@ -142,6 +142,15 @@ impl Moves {
     }
 
     #[inline]
+    pub fn interrupt(color: Color) -> Self {
+        Self {
+            metadata: None,
+            color,
+            action: MoveActionKind::Interruption,
+        }
+    }
+
+    #[inline]
     pub fn color(&self) -> Color {
         self.color
     }
