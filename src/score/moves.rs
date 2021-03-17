@@ -128,7 +128,6 @@ pub struct Moves {
     metadata: Option<Vec<MovesMetadata>>,
     color: Color,
     action: MoveActionKind,
-    // branch
 }
 
 impl Moves {
