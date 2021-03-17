@@ -132,6 +132,7 @@ pub struct Moves {
 }
 
 impl Moves {
+    #[inline]
     pub fn resign(color: Color) -> Self {
         Self {
             metadata: None,
