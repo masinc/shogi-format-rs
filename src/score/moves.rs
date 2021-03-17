@@ -60,7 +60,7 @@ impl ToSquare for AfterMoves {
 }
 
 #[derive(Debug, Clone, Hash, Deserialize, Serialize, PartialEq, Eq)]
-pub enum MovesMetadate {
+pub enum MovesMetadata {
     Comment(String),
     ConsumeTime(Duration),
     TotalConsumeTime(Duration),
@@ -125,7 +125,7 @@ pub enum MoveActionKind {
 
 #[derive(Debug, Clone, Hash, Deserialize, Serialize, PartialEq, Eq)]
 pub struct Moves {
-    metadata: Vec<MovesMetadate>,
+    metadata: Option<Vec<MovesMetadata>>,
     color: Color,
     action: MoveActionKind,
     // branch
