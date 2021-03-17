@@ -134,7 +134,7 @@ pub struct Moves {
 impl Moves {
     pub fn resign(color: Color) -> Self {
         Self {
-            metadata: vec![],
+            metadata: None,
             color,
             action: MoveActionKind::Resignation,
         }
