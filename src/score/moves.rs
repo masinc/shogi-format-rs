@@ -135,7 +135,7 @@ pub enum MoveActionKind {
 
 #[derive(Debug, Clone, Hash, Deserialize, Serialize, PartialEq, Eq)]
 pub struct Moves {
-    metadata: Option<Vec<MovesMetadata>>,
+    metadata: Option<MovesMetadata>,
     color: Color,
     action: MoveActionKind,
 }
