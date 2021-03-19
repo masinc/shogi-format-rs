@@ -70,10 +70,54 @@ impl ToSquare for AfterMoves {
     }
 }
 
-#[derive(Debug, Clone, Hash, Deserialize, Serialize, PartialEq, Eq)]
+#[derive(Default, Debug, Clone, Hash, Deserialize, Serialize, PartialEq, Eq)]
 pub struct MovesMetadata {
     comment: Option<String>,
     consume_time: Option<Duration>,
+}
+
+impl MovesMetadata {
+    #[inline]
+    pub fn builder() -> MovesMetadataBuilder {
+        Default::default()
+    }
+}
+
+#[derive(Default, Debug, Clone, Hash, PartialEq, Eq)]
+pub struct MovesMetadataBuilder {
+    comment: Option<String>,
+    consume_time: Option<Duration>,
+}
+
+impl MovesMetadataBuilder {
+    #[inline]
+    pub fn new() -> Self {
+        Default::default()
+    }
+
+    #[inline]
+    pub fn comment(self, value: impl Into<String>) -> Self {
+        Self {
+            comment: Some(value.into()),
+            ..self
+        }
+    }
+
+    #[inline]
+    pub fn consume_time(self, value: Duration) -> Self {
+        Self {
+            consume_time: Some(value),
+            ..self
+        }
+    }
+
+    #[inline]
+    pub fn build(self) -> MovesMetadata {
+        MovesMetadata {
+            comment: self.comment,
+            consume_time: self.consume_time,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Hash, Deserialize, Serialize, PartialEq, Eq)]
@@ -266,4 +310,35 @@ mod tests {
         let bm_stand = BeforeMoves::new_stand();
         assert_eq!(bm_stand.try_square_ptr(), None);
     }
+
+    #[test]
+    fn moves_metadata_builder() {
+        assert_eq!(MovesMetadata::builder(), MovesMetadataBuilder::new());
+        assert_eq!(MovesMetadata::builder(), MovesMetadataBuilder::default());
+    }
+
+    #[test]
+    fn moves_metadata_comment() {
+        assert_eq!(
+            MovesMetadata::builder().comment("abc").build(),
+            MovesMetadata {
+                comment: Some("abc".into()),
+                ..Default::default()
+            }
+        )
+    }
+
+    #[test]
+    fn moves_metadata_consume_time() {
+        assert_eq!(
+            MovesMetadata::builder()
+                .consume_time(Duration::from_secs(10))
+                .build(),
+            MovesMetadata {
+                consume_time: Some(Duration::from_secs(10)),
+                ..Default::default()
+            }
+        )
+    }
+
 }
