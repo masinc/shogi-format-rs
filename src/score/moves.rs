@@ -71,10 +71,9 @@ impl ToSquare for AfterMoves {
 }
 
 #[derive(Debug, Clone, Hash, Deserialize, Serialize, PartialEq, Eq)]
-pub enum MovesMetadata {
-    Comment(String),
-    ConsumeTime(Duration),
-    TotalConsumeTime(Duration),
+pub struct MovesMetadata {
+    comment: Option<String>,
+    consume_time: Option<Duration>,
 }
 
 #[derive(Debug, Clone, Hash, Deserialize, Serialize, PartialEq, Eq)]
