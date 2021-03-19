@@ -32,6 +32,13 @@ impl BeforeMoves {
     }
 }
 
+impl From<Square> for BeforeMoves {
+    #[inline]
+    fn from(value: Square) -> Self {
+        BeforeMoves::Square(value)
+    }
+}
+
 impl TryToSquare for BeforeMoves {
     fn try_square_ptr(&self) -> Option<&Square> {
         match self {
