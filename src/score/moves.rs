@@ -23,10 +23,12 @@ pub enum BeforeMoves {
 }
 
 impl BeforeMoves {
+    #[inline]
     pub fn new_square(square: Square) -> Self {
         Self::Square(square)
     }
 
+    #[inline]
     pub fn new_stand() -> Self {
         BeforeMoves::Stand
     }
@@ -55,12 +57,14 @@ pub struct AfterMoves {
 }
 
 impl AfterMoves {
+    #[inline]
     pub fn new(square: Square, promote: bool) -> Self {
         Self { square, promote }
     }
 }
 
 impl ToSquare for AfterMoves {
+    #[inline]
     fn square_ptr(&self) -> &Square {
         &self.square
     }
