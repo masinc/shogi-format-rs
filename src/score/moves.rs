@@ -23,12 +23,21 @@ pub enum BeforeMoves {
 }
 
 impl BeforeMoves {
+    #[inline]
     pub fn new_square(square: Square) -> Self {
         Self::Square(square)
     }
 
+    #[inline]
     pub fn new_stand() -> Self {
         BeforeMoves::Stand
+    }
+}
+
+impl From<Square> for BeforeMoves {
+    #[inline]
+    fn from(value: Square) -> Self {
+        BeforeMoves::Square(value)
     }
 }
 
@@ -48,22 +57,67 @@ pub struct AfterMoves {
 }
 
 impl AfterMoves {
+    #[inline]
     pub fn new(square: Square, promote: bool) -> Self {
         Self { square, promote }
     }
 }
 
 impl ToSquare for AfterMoves {
+    #[inline]
     fn square_ptr(&self) -> &Square {
         &self.square
     }
 }
 
-#[derive(Debug, Clone, Hash, Deserialize, Serialize, PartialEq, Eq)]
-pub enum MovesMetadate {
-    Comment(String),
-    ConsumeTime(Duration),
-    TotalConsumeTime(Duration),
+#[derive(Default, Debug, Clone, Hash, Deserialize, Serialize, PartialEq, Eq)]
+pub struct MovesMetadata {
+    comment: Option<String>,
+    consume_time: Option<Duration>,
+}
+
+impl MovesMetadata {
+    #[inline]
+    pub fn builder() -> MovesMetadataBuilder {
+        Default::default()
+    }
+}
+
+#[derive(Default, Debug, Clone, Hash, PartialEq, Eq)]
+pub struct MovesMetadataBuilder {
+    comment: Option<String>,
+    consume_time: Option<Duration>,
+}
+
+impl MovesMetadataBuilder {
+    #[inline]
+    pub fn new() -> Self {
+        Default::default()
+    }
+
+    #[inline]
+    pub fn comment(self, value: impl Into<String>) -> Self {
+        Self {
+            comment: Some(value.into()),
+            ..self
+        }
+    }
+
+    #[inline]
+    pub fn consume_time(self, value: Duration) -> Self {
+        Self {
+            consume_time: Some(value),
+            ..self
+        }
+    }
+
+    #[inline]
+    pub fn build(self) -> MovesMetadata {
+        MovesMetadata {
+            comment: self.comment,
+            consume_time: self.consume_time,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Hash, Deserialize, Serialize, PartialEq, Eq)]
@@ -125,19 +179,51 @@ pub enum MoveActionKind {
 
 #[derive(Debug, Clone, Hash, Deserialize, Serialize, PartialEq, Eq)]
 pub struct Moves {
-    metadata: Vec<MovesMetadate>,
+    metadata: Option<MovesMetadata>,
     color: Color,
     action: MoveActionKind,
-    // branch
 }
 
 impl Moves {
-    pub fn resign(color: Color) -> Self {
+    #[inline]
+    pub fn resignation(color: Color) -> Self {
         Self {
-            metadata: vec![],
+            metadata: None,
             color,
             action: MoveActionKind::Resignation,
         }
+    }
+
+    #[inline]
+    pub fn interruption(color: Color) -> Self {
+        Self {
+            metadata: None,
+            color,
+            action: MoveActionKind::Interruption,
+        }
+    }
+
+    #[inline]
+    pub fn illegal_action(color: Color) -> Self {
+        Self {
+            metadata: None,
+            color,
+            action: MoveActionKind::IllegalAction,
+        }
+    }
+
+    #[inline]
+    pub fn repentition_of_moves(color: Color) -> Self {
+        Self {
+            metadata: None,
+            color,
+            action: MoveActionKind::RepentitionOfMoves,
+        }
+    }
+
+    #[inline]
+    pub fn builder() -> MovesBuilder<(), ()> {
+        Default::default()
     }
 
     #[inline]
@@ -216,6 +302,74 @@ impl Display for Moves {
     }
 }
 
+#[derive(Debug, Clone, Hash, PartialEq, Eq)]
+pub struct MovesBuilder<TColor, TMoveActionKind> {
+    metadata: Option<MovesMetadata>,
+    color: TColor,
+    action: TMoveActionKind,
+}
+
+impl MovesBuilder<(), ()> {
+    #[inline]
+    pub fn new() -> Self {
+        MovesBuilder {
+            metadata: None,
+            color: (),
+            action: (),
+        }
+    }
+}
+
+impl<TColor, TMoveActionKind> MovesBuilder<TColor, TMoveActionKind> {
+    #[inline]
+    pub fn metadata(self, value: MovesMetadata) -> Self {
+        Self {
+            metadata: Some(value),
+            ..self
+        }
+    }
+}
+
+impl<TMoveActionKind> MovesBuilder<(), TMoveActionKind> {
+    #[inline]
+    pub fn color(self, value: Color) -> MovesBuilder<Color, TMoveActionKind> {
+        MovesBuilder {
+            metadata: self.metadata,
+            color: value,
+            action: self.action,
+        }
+    }
+}
+
+impl<TColor> MovesBuilder<TColor, ()> {
+    #[inline]
+    pub fn action(self, value: impl Into<MoveActionKind>) -> MovesBuilder<TColor, MoveActionKind> {
+        MovesBuilder {
+            metadata: self.metadata,
+            color: self.color,
+            action: value.into(),
+        }
+    }
+}
+
+impl MovesBuilder<Color, MoveActionKind> {
+    #[inline]
+    pub fn build(self) -> Moves {
+        Moves {
+            metadata: self.metadata,
+            color: self.color,
+            action: self.action,
+        }
+    }
+}
+
+impl Default for MovesBuilder<(), ()> {
+    #[inline]
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -246,5 +400,61 @@ mod tests {
 
         let bm_stand = BeforeMoves::new_stand();
         assert_eq!(bm_stand.try_square_ptr(), None);
+    }
+
+    #[test]
+    fn moves_metadata_builder() {
+        assert_eq!(MovesMetadata::builder(), MovesMetadataBuilder::new());
+        assert_eq!(MovesMetadata::builder(), MovesMetadataBuilder::default());
+    }
+
+    #[test]
+    fn moves_metadata_comment() {
+        assert_eq!(
+            MovesMetadata::builder().comment("abc").build(),
+            MovesMetadata {
+                comment: Some("abc".into()),
+                ..Default::default()
+            }
+        )
+    }
+
+    #[test]
+    fn moves_metadata_consume_time() {
+        assert_eq!(
+            MovesMetadata::builder()
+                .consume_time(Duration::from_secs(10))
+                .build(),
+            MovesMetadata {
+                consume_time: Some(Duration::from_secs(10)),
+                ..Default::default()
+            }
+        )
+    }
+
+    #[test]
+    fn moves_builder() {
+        assert_eq!(Moves::builder(), MovesBuilder::new());
+        assert_eq!(Moves::builder(), MovesBuilder::default());
+    }
+
+    #[test]
+    fn moves_builder_build() {
+        let builder = Moves::builder()
+            .metadata(MovesMetadataBuilder::new().comment("abc").build())
+            .color(Color::White)
+            .action(MoveActionKind::Resignation);
+
+        assert_eq!(
+            builder.build(),
+            Moves {
+                metadata: Some(MovesMetadata {
+                    comment: Some("abc".into()),
+                    ..Default::default()
+                }),
+                color: Color::White,
+                action: MoveActionKind::Resignation,
+            }
+        )
     }
 }

@@ -831,6 +831,13 @@ impl BoardType {
     }
 }
 
+impl Default for BoardType {
+    #[inline]
+    fn default() -> Self {
+        Self::Even
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
