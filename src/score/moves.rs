@@ -186,7 +186,7 @@ pub struct Moves {
 
 impl Moves {
     #[inline]
-    pub fn resign(color: Color) -> Self {
+    pub fn resignation(color: Color) -> Self {
         Self {
             metadata: None,
             color,
@@ -195,7 +195,7 @@ impl Moves {
     }
 
     #[inline]
-    pub fn interrupt(color: Color) -> Self {
+    pub fn interruption(color: Color) -> Self {
         Self {
             metadata: None,
             color,
