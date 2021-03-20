@@ -204,6 +204,24 @@ impl Moves {
     }
 
     #[inline]
+    pub fn illegal_action(color: Color) -> Self {
+        Self {
+            metadata: None,
+            color,
+            action: MoveActionKind::IllegalAction,
+        }
+    }
+
+    #[inline]
+    pub fn repentition_of_moves(color: Color) -> Self {
+        Self {
+            metadata: None,
+            color,
+            action: MoveActionKind::RepentitionOfMoves,
+        }
+    }
+
+    #[inline]
     pub fn builder() -> MovesBuilder<(), ()> {
         Default::default()
     }
